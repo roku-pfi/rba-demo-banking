@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rba-demo-banking"
-version = "0.1.0"
-description = "Demo-2 relying party: opaque banking home that authenticates through the IdP."
+version = "0.2.0"
+description = "Demo-3 relying party: opaque banking home + presenter walkthrough controls."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presenter walkthrough</title>
+  <link rel="stylesheet" href="/static/home.css">
+</head>
+<body class="kit">
+  <header class="top">
+    <p class="mark">Presenter <span class="tag">not customer chrome</span></p>
+  </header>
+  <main class="sheet">
+    <p class="hello">Next-login context for Roku Bank. Forwards country/ASN to the IdP. Reasons stay in admin (second window).</p>
+    <h1>Walkthrough</h1>
+    <ol class="script">
+      <li>New country first (cold seed) — Freeman MFA, travel should stay quiet.</li>
+      <li>Home — ALLOW into the bank.</li>
+      <li>Teleport immediately after home — travel MFA.</li>
+      <li>VPN — untrusted network, not teleport.</li>
+    </ol>
+    <ul class="scenarios">
+      {% for row in scenarios %}
+      <li>
+        <h2>{{ row.title }}</h2>
+        <p class="blurb">{{ row.blurb }}</p>
+        <p class="expect">{{ row.expect }}</p>
+        <p class="meta">{{ row.country }} / ASN {{ row.asn }}</p>
+        <a href="/walkthrough/start?scenario={{ row.id }}">Start this login</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </main>
+</body>
+</html>

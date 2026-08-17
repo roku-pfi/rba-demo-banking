@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from rba_demo_banking.config import Settings, get_settings
 from rba_demo_banking.idp import HttpIdpClient, IdpClient, IdpError
+from rba_demo_banking.scenarios import SCENARIOS, Scenario, get_scenario
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +25,23 @@ BALANCES = (
 )
 
 
-def login_url(settings: Settings) -> str:
+def _signals(settings: Settings, scenario: Scenario) -> tuple[str, str]:
+    if scenario.id == "home":
+        return settings.home_country, settings.home_asn
+    return scenario.country, scenario.asn
+
+
+def login_url(settings: Settings, scenario: Scenario | None = None) -> str:
+    chosen = scenario or get_scenario("home")
+    assert chosen is not None
+    country, asn = _signals(settings, chosen)
     callback = f"{settings.public_url.rstrip('/')}/callback"
     query = urlencode(
         {
             "application_id": settings.application_id,
             "redirect_uri": callback,
-            "country": settings.home_country,
-            "asn": settings.home_asn,
+            "country": country,
+            "asn": asn,
         }
     )
     return f"{settings.idp_public_url.rstrip('/')}/login?{query}"
@@ -46,7 +56,7 @@ def create_app(
     idp = idp_client or HttpIdpClient(settings)
     templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version="0.2.0")
     app.state.settings = settings
     app.state.idp = idp
     static = WEB_DIR / "static"
@@ -59,6 +69,17 @@ def create_app(
             "samesite": "lax",
             "path": "/",
         }
+
+    def _abandon_session(request: Request) -> None:
+        token = request.cookies.get(settings.session_cookie)
+        if token:
+            idp.logout(token)
+
+    def _start_login(request: Request, scenario: Scenario) -> Response:
+        _abandon_session(request)
+        response = RedirectResponse(login_url(settings, scenario), status_code=302)
+        response.delete_cookie(settings.session_cookie, path="/")
+        return response
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -84,6 +105,22 @@ def create_app(
             },
         )
 
+    @app.get("/walkthrough")
+    def walkthrough(request: Request):
+        """Presenter kit — not linked from the customer home (ADR-0023)."""
+        return templates.TemplateResponse(
+            request=request,
+            name="walkthrough.html",
+            context={"scenarios": SCENARIOS},
+        )
+
+    @app.get("/walkthrough/start")
+    def walkthrough_start(request: Request, scenario: str = "home"):
+        chosen = get_scenario(scenario)
+        if chosen is None:
+            return RedirectResponse("/walkthrough", status_code=302)
+        return _start_login(request, chosen)
+
     @app.get("/callback")
     def callback(code: str | None = None):
         if not code:
@@ -102,9 +139,7 @@ def create_app(
 
     @app.post("/logout")
     def logout(request: Request) -> Response:
-        token = request.cookies.get(settings.session_cookie)
-        if token:
-            idp.logout(token)
+        _abandon_session(request)
         response = RedirectResponse("/", status_code=302)
         response.delete_cookie(settings.session_cookie, path="/")
         return response

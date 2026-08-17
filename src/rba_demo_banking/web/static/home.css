@@ -61,3 +61,33 @@ h1 { font-size: 1.75rem; margin: 0 0 1.25rem; font-weight: 600; }
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
+.tag {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0;
+  margin-left: 0.5rem;
+}
+.kit .sheet { max-width: 46rem; }
+.script {
+  color: var(--muted);
+  padding-left: 1.2rem;
+  margin: 0 0 1.5rem;
+  line-height: 1.45;
+}
+.scenarios { list-style: none; padding: 0; margin: 0; }
+.scenarios li {
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 1rem 1.15rem 1.15rem;
+  margin-bottom: 0.75rem;
+}
+.scenarios h2 { font-size: 1.15rem; margin: 0 0 0.35rem; font-weight: 600; }
+.blurb, .expect, .meta { margin: 0 0 0.4rem; }
+.blurb { color: var(--ink); }
+.expect { color: var(--accent); font-size: 0.95rem; }
+.meta { color: var(--muted); font-size: 0.9rem; }
+.scenarios a {
+  color: var(--accent);
+  font-weight: 600;
+}

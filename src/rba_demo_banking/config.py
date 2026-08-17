@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     session_cookie: str = "rba_demo_session"
     idp_timeout_seconds: float = 2.0
 
-    # Default next-login context is "home" (Demo-3 will vary this).
+    # Default anonymous / home-scenario context (Demo-3 walkthrough varies the rest).
     home_country: str = "AR"
     home_asn: str = "7303"
 
