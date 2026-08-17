@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roku Bank</title>
+  <link rel="stylesheet" href="/static/home.css">
+</head>
+<body>
+  <header class="top">
+    <p class="mark">Roku Bank</p>
+    <form method="post" action="/logout">
+      <button type="submit">Sign out</button>
+    </form>
+  </header>
+  <main class="sheet">
+    <p class="hello">Welcome back, {{ email }}</p>
+    <h1>Accounts</h1>
+    <ul class="accounts">
+      {% for row in balances %}
+      <li>
+        <span class="name">{{ row.name }}</span>
+        <span class="number">{{ row.number }}</span>
+        <span class="amount">{{ row.amount }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </main>
+</body>
+</html>
