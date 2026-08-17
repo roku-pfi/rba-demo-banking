@@ -2,7 +2,7 @@
 
 Demo-3 tenant app in namespace `demo`. Status: `../docs/plans/status.md`.
 ADR-0023 (opaque), ADR-0024 (separate app), ADR-0025 (ns `demo`), ADR-0026
-(walkthrough on the relying party). Next is Demo-4 (WebAuthn).
+(walkthrough on the relying party). Demo-4 WebAuthn lives on the IdP.
 
 ## Guardrails
 
