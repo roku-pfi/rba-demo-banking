@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     home_country: str = "AR"
     home_asn: str = "7303"
 
+    # Credential-stuffing walkthrough (ADR-0027): the account the presenter's
+    # stand-in attacker hammers, and the address it comes from. TEST-NET-2
+    # (RFC 5737) so it is never a real host.
+    victim_email: str = "demo@example.com"
+    attacker_ip: str = "198.51.100.66"
+
 
 @lru_cache
 def get_settings() -> Settings:

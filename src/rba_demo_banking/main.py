@@ -75,8 +75,27 @@ def create_app(
         if token:
             idp.logout(token)
 
+    def _run_attack(scenario: Scenario) -> None:
+        """Fire the scenario's wrong-password burst before the presenter logs in.
+
+        Sequential and small (≤12): this is a demo of a *signal*, not a load
+        test, and each attempt has to be recorded before the next real login is
+        scored. Best effort — a failure here should spoil the scenario, not the
+        walkthrough.
+        """
+        for _ in range(scenario.failed_attempts):
+            try:
+                idp.failed_attempt(
+                    settings.victim_email,
+                    country=scenario.country,
+                    asn=scenario.asn,
+                )
+            except IdpError:
+                logger.warning("attack step dropped for scenario=%s", scenario.id)
+
     def _start_login(request: Request, scenario: Scenario) -> Response:
         _abandon_session(request)
+        _run_attack(scenario)
         response = RedirectResponse(login_url(settings, scenario), status_code=302)
         response.delete_cookie(settings.session_cookie, path="/")
         return response

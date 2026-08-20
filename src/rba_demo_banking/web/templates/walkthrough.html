@@ -18,14 +18,19 @@
       <li>Home — ALLOW into the bank.</li>
       <li>Teleport immediately after home — travel MFA.</li>
       <li>VPN — untrusted network, not teleport.</li>
+      <li>Stuffing burst — REAUTHENTICATE. Then lockout — BLOCK, no challenge.</li>
     </ol>
+    <p class="hello">Run in this order and all four PDP actions appear once: allow, step-up, re-authenticate, block. Keep the stuffing steps last — they leave failures inside the 24h window that keep escalating later logins.</p>
     <ul class="scenarios">
       {% for row in scenarios %}
       <li>
         <h2>{{ row.title }}</h2>
         <p class="blurb">{{ row.blurb }}</p>
         <p class="expect">{{ row.expect }}</p>
-        <p class="meta">{{ row.country }} / ASN {{ row.asn }}</p>
+        <p class="meta">
+          {{ row.country }} / ASN {{ row.asn }}
+          {% if row.failed_attempts %}· fires {{ row.failed_attempts }} wrong passwords first{% endif %}
+        </p>
         <a href="/walkthrough/start?scenario={{ row.id }}">Start this login</a>
       </li>
       {% endfor %}

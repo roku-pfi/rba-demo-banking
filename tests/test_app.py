@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from rba_contracts import CallbackTokenResponse, SessionResponse, SessionToken, UserPublic
 
 from rba_demo_banking.config import Settings
+from rba_demo_banking.idp import IdpError
 from rba_demo_banking.main import create_app, login_url
 from rba_demo_banking.scenarios import SCENARIOS, get_scenario
 
@@ -17,6 +18,7 @@ class StubIdp:
         self.codes: dict[str, str] = {"good-code": "sess-token"}
         self.sessions: dict[str, str] = {"sess-token": "demo@example.com"}
         self.exchanges: list[str] = []
+        self.attempts: list[tuple[str, str, str]] = []
 
     def exchange(self, code: str) -> CallbackTokenResponse:
         self.exchanges.append(code)
@@ -47,6 +49,9 @@ class StubIdp:
 
     def logout(self, token: str) -> None:
         self.sessions.pop(token, None)
+
+    def failed_attempt(self, email: str, *, country: str, asn: str) -> None:
+        self.attempts.append((email, country, asn))
 
 
 def _client(idp: StubIdp | None = None) -> TestClient:
@@ -169,6 +174,84 @@ def test_walkthrough_start_unknown_scenario_stays_on_kit() -> None:
     )
     assert resp.status_code == 302
     assert resp.headers["location"] == "/walkthrough"
+
+
+def test_ordinary_scenario_fires_no_attack() -> None:
+    idp = StubIdp()
+    client = _client(idp)
+    client.get(
+        "/walkthrough/start", params={"scenario": "home"}, follow_redirects=False
+    )
+    assert idp.attempts == []
+
+
+def test_stuffing_burst_fires_wrong_passwords_then_hands_over_the_login() -> None:
+    """The presenter kit plays the attacker; the real login is still done by hand."""
+    idp = StubIdp()
+    client = _client(idp)
+    resp = client.get(
+        "/walkthrough/start",
+        params={"scenario": "stuffing_burst"},
+        follow_redirects=False,
+    )
+    assert len(idp.attempts) == 4
+    assert idp.attempts[0] == ("demo@example.com", "AR", "7303")
+    assert len({a for a in idp.attempts}) == 1
+
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert location.startswith("http://idp.test/login?")
+    # The presenter's own login must arrive from the same context as the attack.
+    assert "country=AR" in location
+    assert "asn=7303" in location
+
+
+def test_stuffing_runs_from_the_users_ordinary_context() -> None:
+    """The whole point of ADR-0027: Freeman must NOT be able to see this.
+
+    If the attack runs from a novel country/ASN, Freeman scores it CRITICAL on
+    novelty alone and BLOCKs before the failed-login band is ever consulted —
+    the demo then proves nothing about credential stuffing. Keep the context
+    identical to `home` so the failure count is the only thing that moves.
+    """
+    home = get_scenario("home")
+    assert home is not None
+    for scenario_id in ("stuffing_burst", "stuffing_lockout"):
+        row = get_scenario(scenario_id)
+        assert row is not None
+        assert (row.country, row.asn) == (home.country, home.asn), scenario_id
+
+
+def test_stuffing_lockout_crosses_the_lockout_band() -> None:
+    idp = StubIdp()
+    client = _client(idp)
+    client.get(
+        "/walkthrough/start",
+        params={"scenario": "stuffing_lockout"},
+        follow_redirects=False,
+    )
+    # The PDP's lockout threshold is 10; the scenario must clear it, not graze it.
+    assert len(idp.attempts) == 12
+
+
+def test_attack_failure_does_not_break_the_walkthrough() -> None:
+    class BrokenIdp(StubIdp):
+        def failed_attempt(self, email: str, *, country: str, asn: str) -> None:
+            raise IdpError("IdP unavailable")
+
+    resp = _client(BrokenIdp()).get(
+        "/walkthrough/start",
+        params={"scenario": "stuffing_burst"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"].startswith("http://idp.test/login?")
+
+
+def test_stuffing_scenarios_never_carry_a_real_password() -> None:
+    """The bank does not know the victim's password and must not appear to."""
+    html = _client().get("/walkthrough").text
+    assert "demo-password" not in html
 
 
 def test_login_url_uses_scenario_signals() -> None:
