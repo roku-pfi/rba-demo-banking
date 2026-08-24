@@ -4,18 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Roku Bank</title>
+  <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/home.css">
 </head>
 <body>
   <header class="top">
-    <p class="mark">Roku Bank</p>
-    <form method="post" action="/logout">
-      <button type="submit">Sign out</button>
-    </form>
+    <div class="brand"><p class="mark">Roku Bank</p></div>
+    <div class="who">
+      <span>{{ email }}</span>
+      <form method="post" action="/logout">
+        <button type="submit">Sign out</button>
+      </form>
+    </div>
   </header>
   <main class="sheet">
     <p class="hello">Welcome back, {{ email }}</p>
     <h1>Accounts</h1>
+    {% if balances %}
     <ul class="accounts">
       {% for row in balances %}
       <li>
@@ -25,6 +30,17 @@
       </li>
       {% endfor %}
     </ul>
+    {% else %}
+    <p class="empty">No accounts are visible with your current access.</p>
+    {% endif %}
+    {% if can_transfer %}
+    <a class="action" href="/transfer">Send money</a>
+    {% else %}
+    <p class="empty">Your access is read-only. Sending money is not available.</p>
+    {% endif %}
+    {# What this session actually holds, straight from GET /session. The bank
+       never sees a role or a group — only these strings. #}
+    <p class="perms">session permissions{% for scope in permissions %} &nbsp;{{ scope }}{% endfor %}</p>
   </main>
 </body>
 </html>

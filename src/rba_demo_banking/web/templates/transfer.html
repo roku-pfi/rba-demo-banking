@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roku Bank</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/home.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><p class="mark">Roku Bank</p></div>
+    <div class="who">
+      <span>{{ email }}</span>
+      <form method="post" action="/logout">
+        <button type="submit">Sign out</button>
+      </form>
+    </div>
+  </header>
+  <main class="sheet">
+    <p class="hello">Signed in as {{ email }}</p>
+    <h1>Send money</h1>
+    {% if sent %}
+    <p class="sent">Sent {{ sent }} to ···· 9081.</p>
+    {% else %}
+    <form method="post" action="/transfer" class="transfer">
+      <label>To account
+        <input name="to" value="···· 9081" readonly>
+      </label>
+      <label>Amount
+        <input name="amount" value="AR$ 12.500,00" readonly>
+      </label>
+      <button type="submit">Send</button>
+    </form>
+    {% endif %}
+    <a class="action secondary" href="/">Back to accounts</a>
+  </main>
+</body>
+</html>

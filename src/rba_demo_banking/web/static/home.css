@@ -1,93 +1,236 @@
-:root {
-  --ink: #12201c;
-  --muted: #5a6b66;
-  --paper: #f4f1ea;
-  --card: #fffdf8;
-  --line: #d9d2c5;
-  --accent: #0f6b4c;
-}
-* { box-sizing: border-box; }
+/* Roku Bank — the relying party. This is a customer-facing screen, so it uses
+   the light theme (ADR-0030). Tokens and @font-face live in theme.css, which
+   every template links first.
+
+   The bank is deliberately plain. It exists to show that a relying party can
+   consume `permissions` from GET /session and gate on them without knowing that
+   roles, groups or risk scoring exist at all. */
+
 body {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
-  background: var(--paper);
+  background: var(--ground);
   color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
 }
+
 .top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.75rem;
+  gap: 1rem;
+  padding: 1rem 1.6rem;
   border-bottom: 1px solid var(--line);
-  background: var(--card);
+  background: var(--surface);
 }
+
+.brand { display: flex; align-items: center; gap: 0.5rem; }
+
+.brand::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background: var(--accent);
+  -webkit-mask: var(--shield) center / contain no-repeat;
+  mask: var(--shield) center / contain no-repeat;
+}
+
+:root {
+  --shield: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l7.5 3v5.5c0 4.4-3 8.2-7.5 9.5-4.5-1.3-7.5-5.1-7.5-9.5V6z'/%3E%3C/svg%3E");
+}
+
 .mark {
   margin: 0;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
+
+.who { display: flex; align-items: center; gap: 0.8rem; font-size: 0.8rem; color: var(--muted); }
+
 button {
-  font: inherit;
-  background: transparent;
+  padding: 0.5rem 0.85rem;
   border: 1px solid var(--line);
-  padding: 0.35rem 0.8rem;
-  cursor: pointer;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
 }
+button:hover { background: var(--sunk); }
+
 .sheet {
-  max-width: 42rem;
-  margin: 2.5rem auto;
+  max-width: 34rem;
+  margin: 2.2rem auto 0;
   padding: 0 1.5rem 3rem;
 }
-.hello { color: var(--muted); margin: 0 0 0.35rem; }
-h1 { font-size: 1.75rem; margin: 0 0 1.25rem; font-weight: 600; }
-.accounts { list-style: none; padding: 0; margin: 0; }
+
+.hello { margin: 0 0 0.3rem; color: var(--muted); font-size: 0.85rem; }
+
+h1 {
+  margin: 0 0 1.3rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.accounts { list-style: none; padding: 0; margin: 0 0 1.4rem; }
+
 .accounts li {
   display: grid;
   grid-template-columns: 1fr auto;
   grid-template-rows: auto auto;
   gap: 0.15rem 1rem;
-  background: var(--card);
+  padding: 0.95rem 1.1rem;
+  margin-bottom: 0.6rem;
+  background: var(--surface);
   border: 1px solid var(--line);
-  padding: 1rem 1.15rem;
-  margin-bottom: 0.65rem;
+  border-radius: 9px;
 }
-.name { font-weight: 600; }
-.number { grid-column: 1; color: var(--muted); font-size: 0.9rem; }
+
+.name { font-weight: 600; font-size: 0.95rem; }
+.number { grid-column: 1; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
+
+/* Money is read digit by digit, so it gets the mono face and tabular figures. */
 .amount {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
+  font-family: var(--mono);
+  font-size: 1.02rem;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
 }
-.tag {
-  font-weight: 400;
-  color: var(--muted);
-  font-size: 0.85rem;
-  letter-spacing: 0;
-  margin-left: 0.5rem;
+
+.tag { margin-left: 0.5rem; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+
+/* Permission-gated affordances (ADR-0029). Hiding the button is presentation;
+   the check on the POST handler is the control. */
+.action {
+  display: inline-block;
+  margin-top: 0.4rem;
+  padding: 0.7rem 1.1rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
 }
-.kit .sheet { max-width: 46rem; }
-.script {
-  color: var(--muted);
-  padding-left: 1.2rem;
-  margin: 0 0 1.5rem;
-  line-height: 1.45;
-}
-.scenarios { list-style: none; padding: 0; margin: 0; }
-.scenarios li {
-  background: var(--card);
+.action:hover { background: var(--accent-hover); }
+
+.action.secondary {
+  background: transparent;
+  color: var(--ink);
   border: 1px solid var(--line);
-  padding: 1rem 1.15rem 1.15rem;
-  margin-bottom: 0.75rem;
+  font-weight: 500;
 }
-.scenarios h2 { font-size: 1.15rem; margin: 0 0 0.35rem; font-weight: 600; }
-.blurb, .expect, .meta { margin: 0 0 0.4rem; }
-.blurb { color: var(--ink); }
-.expect { color: var(--accent); font-size: 0.95rem; }
-.meta { color: var(--muted); font-size: 0.9rem; }
-.scenarios a {
-  color: var(--accent);
+.action.secondary:hover { background: var(--sunk); }
+
+.empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  background: var(--sunk);
+  color: var(--muted);
+  font-size: 0.87rem;
+  line-height: 1.6;
+}
+
+.empty.muted {
+  margin-top: 0.6rem;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 0.83rem;
+}
+
+.sent {
+  margin: 0 0 1.2rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--sev-1);
+  border-radius: 9px;
+  background: var(--sev-1-bg);
+  color: var(--sev-1);
   font-weight: 600;
 }
+
+/* The required scope, shown on purpose. It is not a secret, and naming it turns
+   "it doesn't work" into a ticket an operator can act on. */
+.scope {
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.perms {
+  margin: 1.3rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+
+.transfer { display: grid; gap: 0.9rem; margin: 0 0 1.5rem; max-width: 22rem; }
+.transfer label { display: grid; gap: 0.3rem; font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+
+.transfer input {
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
+.transfer button {
+  justify-self: start;
+  padding: 0.72rem 1.1rem;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.transfer button:hover { background: var(--accent-hover); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: var(--mono); font-size: 0.85em; }
+
+/* --- presenter walkthrough (not customer chrome) --- */
+
+.kit .sheet { max-width: 46rem; }
+
+.script {
+  margin: 0 0 1.5rem;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.scenarios { list-style: none; padding: 0; margin: 0; }
+
+.scenarios li {
+  padding: 1rem 1.15rem 1.15rem;
+  margin-bottom: 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.scenarios h2 { margin: 0 0 0.35rem; font-size: 1.05rem; font-weight: 600; }
+.blurb, .expect, .meta { margin: 0 0 0.4rem; font-size: 0.88rem; }
+.blurb { color: var(--ink); }
+.expect { color: var(--accent); font-weight: 500; }
+.meta { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; }
+.scenarios a { font-weight: 600; }

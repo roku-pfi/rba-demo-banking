@@ -24,6 +24,11 @@ BALANCES = (
     {"name": "Savings", "number": "···· 9081", "amount": "AR$ 1.502.000,00"},
 )
 
+# Permissions this relying party asks about (ADR-0029). The bank never sees a
+# role or a group — the IdP flattens the chain and hands over scope strings.
+PERM_ACCOUNT_READ = "account:read"
+PERM_TRANSFER_CREATE = "transfer:create"
+
 
 def _signals(settings: Settings, scenario: Scenario) -> tuple[str, str]:
     if scenario.id == "home":
@@ -115,13 +120,71 @@ def create_app(
             response = RedirectResponse(login_url(settings), status_code=302)
             response.delete_cookie(settings.session_cookie, path="/")
             return response
+        permissions = set(session.permissions)
         return templates.TemplateResponse(
             request=request,
             name="home.html",
             context={
                 "email": session.user.email,
-                "balances": BALANCES,
+                # A signed-in user without `account:read` sees the shell and no
+                # balances — sign-in and visibility are separate grants.
+                "balances": BALANCES if PERM_ACCOUNT_READ in permissions else (),
+                "can_transfer": PERM_TRANSFER_CREATE in permissions,
+                # Shown on the page: what the bank was handed, verbatim.
+                "permissions": sorted(permissions),
             },
+        )
+
+    def _require(request: Request, permission: str):
+        """Resolve the session and authorize one operation (RF-21).
+
+        Returns ``(session, None)`` when allowed, ``(None, response)`` when not.
+        The bank asks the IdP on every request rather than trusting anything in
+        the cookie, so a role revoked mid-session stops working immediately.
+        """
+        token = request.cookies.get(settings.session_cookie)
+        if not token:
+            return None, RedirectResponse(login_url(settings), status_code=302)
+        try:
+            session = idp.get_session(token)
+        except IdpError:
+            response = RedirectResponse(login_url(settings), status_code=302)
+            response.delete_cookie(settings.session_cookie, path="/")
+            return None, response
+        if permission not in set(session.permissions):
+            return None, templates.TemplateResponse(
+                request=request,
+                name="denied.html",
+                status_code=403,
+                context={
+                    "email": session.user.email,
+                    "permission": permission,
+                },
+            )
+        return session, None
+
+    @app.get("/transfer")
+    def transfer_form(request: Request):
+        session, refused = _require(request, PERM_TRANSFER_CREATE)
+        if refused is not None:
+            return refused
+        return templates.TemplateResponse(
+            request=request,
+            name="transfer.html",
+            context={"email": session.user.email, "sent": None},
+        )
+
+    @app.post("/transfer")
+    def transfer_submit(request: Request):
+        # Checked again on the write path. Hiding the button is presentation;
+        # this is the control.
+        session, refused = _require(request, PERM_TRANSFER_CREATE)
+        if refused is not None:
+            return refused
+        return templates.TemplateResponse(
+            request=request,
+            name="transfer.html",
+            context={"email": session.user.email, "sent": "AR$ 12.500,00"},
         )
 
     @app.get("/walkthrough")

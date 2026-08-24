@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roku Bank</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/home.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><p class="mark">Roku Bank</p></div>
+    <div class="who">
+      <span>{{ email }}</span>
+      <form method="post" action="/logout">
+        <button type="submit">Sign out</button>
+      </form>
+    </div>
+  </header>
+  <main class="sheet">
+    <p class="hello">Signed in as {{ email }}</p>
+    <h1>Not available</h1>
+    <p class="empty">
+      Your access does not include this operation. If you need it, ask an
+      administrator to change your role.
+    </p>
+    {# Naming the scope is deliberate: it is not a secret, and it turns "it
+       doesn't work" into a ticket an operator can act on. #}
+    <p class="empty muted">Required <span class="scope">{{ permission }}</span></p>
+    <p><a class="action secondary" href="/">Back to accounts</a></p>
+  </main>
+</body>
+</html>

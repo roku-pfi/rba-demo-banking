@@ -13,12 +13,21 @@ from rba_demo_banking.main import create_app, login_url
 from rba_demo_banking.scenarios import SCENARIOS, get_scenario
 
 
+# What the IdP flattens the RBAC chain down to (ADR-0029). The bank never sees
+# a role or a group — only these scope strings.
+CUSTOMER_PERMISSIONS = ["account:read", "transaction:read", "transfer:create"]
+VIEWER_PERMISSIONS = ["account:read", "transaction:read"]
+
+
 class StubIdp:
-    def __init__(self) -> None:
+    def __init__(self, permissions: list[str] | None = None) -> None:
         self.codes: dict[str, str] = {"good-code": "sess-token"}
         self.sessions: dict[str, str] = {"sess-token": "demo@example.com"}
         self.exchanges: list[str] = []
         self.attempts: list[tuple[str, str, str]] = []
+        self.permissions = (
+            CUSTOMER_PERMISSIONS if permissions is None else permissions
+        )
 
     def exchange(self, code: str) -> CallbackTokenResponse:
         self.exchanges.append(code)
@@ -45,6 +54,8 @@ class StubIdp:
                 is_admin=False,
             ),
             expires_at=datetime(2026, 8, 17, tzinfo=timezone.utc),
+            application_id="demo-banking-app",
+            permissions=list(self.permissions),
         )
 
     def logout(self, token: str) -> None:
@@ -262,3 +273,77 @@ def test_login_url_uses_scenario_signals() -> None:
     assert "country=US" in url
     assert "asn=13335" in url
     assert "risk" not in url
+
+
+# ------------------------------------------------------ RBAC enforcement (RF-21)
+
+
+def _signed_in(idp: StubIdp) -> TestClient:
+    """A client holding a live session cookie for `idp`."""
+    client = _client(idp)
+    client.get("/callback?code=good-code", follow_redirects=False)
+    return client
+
+
+def test_customer_sees_balances_and_the_transfer_action() -> None:
+    html = _signed_in(StubIdp()).get("/").text
+    assert "Everyday" in html
+    assert "Send money" in html
+
+
+def test_viewer_sees_balances_but_no_transfer_action() -> None:
+    """Same application, same login, one permission short."""
+    html = _signed_in(StubIdp(VIEWER_PERMISSIONS)).get("/").text
+    assert "Everyday" in html
+    assert "Send money" not in html
+    assert "read-only" in html
+
+
+def test_viewer_is_refused_the_transfer_page() -> None:
+    resp = _signed_in(StubIdp(VIEWER_PERMISSIONS)).get("/transfer")
+    assert resp.status_code == 403
+    assert "transfer:create" in resp.text
+
+
+def test_viewer_is_refused_the_transfer_post() -> None:
+    """The control is on the write path, not on whether the button was drawn.
+
+    Hiding the affordance is presentation; a viewer who posts the form directly
+    must still be refused.
+    """
+    resp = _signed_in(StubIdp(VIEWER_PERMISSIONS)).post("/transfer")
+    assert resp.status_code == 403
+    assert "Sent" not in resp.text
+
+
+def test_customer_can_complete_a_transfer() -> None:
+    resp = _signed_in(StubIdp()).post("/transfer")
+    assert resp.status_code == 200
+    assert "Sent" in resp.text
+
+
+def test_account_read_gates_the_balances() -> None:
+    """Signing in and being allowed to see money are separate grants."""
+    html = _signed_in(StubIdp(["transaction:read"])).get("/").text
+    assert "Everyday" not in html
+    assert "No accounts are visible" in html
+
+
+def test_transfer_without_a_session_redirects_to_login() -> None:
+    resp = _client().get("/transfer", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["location"].startswith("http://idp.test/login?")
+
+
+def test_theme_and_fonts_are_served() -> None:
+    """The bank carries its own copy of the shared theme (it is a separate
+    deployable). A 404 here is silent, so it is asserted rather than eyeballed."""
+    client = _client()
+    theme = client.get("/static/theme.css")
+    assert theme.status_code == 200
+    assert "--accent" in theme.text
+    assert "fonts.googleapis.com" not in theme.text
+
+    served = client.get("/static/fonts/instrument-sans-400700-latin.woff2")
+    assert served.status_code == 200
+    assert served.content[:4] == b"wOF2"
