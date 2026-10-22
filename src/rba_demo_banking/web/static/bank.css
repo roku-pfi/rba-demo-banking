@@ -48,7 +48,8 @@ a { color: inherit; }
   display: flex;
   align-items: center;
   gap: 2rem;
-  padding: 0.875rem max(1rem, calc((100vw - 64rem) / 2));
+  /* Lines up with main's 64rem column and its 1rem gutter. */
+  padding: 0.875rem max(1rem, calc((100vw - 64rem) / 2 + 1rem));
   background: rgba(243, 245, 244, 0.88);
   backdrop-filter: blur(12px);
 }
