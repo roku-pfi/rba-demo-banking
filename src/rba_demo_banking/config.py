@@ -32,7 +32,9 @@ class Settings(BaseSettings):
     # This app's public origin (registered redirect_uri).
     public_url: str = "http://localhost:8002"
 
-    application_id: str = "roku-bank-web"
+    # The bank's public client id at the IdP (rba_idp.client_ids.SEEDED): what
+    # goes in login URLs. The internal application id never leaves the IdP.
+    client_id: str = "rk_Bk7mQ2xVn9PwR4tL"
     session_cookie: str = "rba_demo_session"
     idp_timeout_seconds: float = 2.0
 

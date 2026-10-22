@@ -87,7 +87,7 @@ def test_anonymous_home_redirects_to_idp() -> None:
     assert resp.status_code == 302
     location = resp.headers["location"]
     assert location.startswith("http://idp.test/login?")
-    assert "application_id=roku-bank-web" in location
+    assert "client_id=rk_Bk7mQ2xVn9PwR4tL" in location
     assert "redirect_uri=http%3A%2F%2Fbank.test%2Fcallback" in location
     assert "country=AR" in location
     assert "asn=7303" in location
@@ -175,7 +175,7 @@ def test_walkthrough_start_forwards_country_asn_and_clears_session() -> None:
     assert location.startswith("http://idp.test/login?")
     assert "country=JP" in location
     assert "asn=2516" in location
-    assert "application_id=roku-bank-web" in location
+    assert "client_id=rk_Bk7mQ2xVn9PwR4tL" in location
     assert "sess-token" not in idp.sessions
     home = client.get("/", follow_redirects=False)
     assert home.status_code == 302

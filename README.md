@@ -20,7 +20,7 @@ Package version: **0.2.0**. Pins `rba-contracts` ≥ 0.5.0.
 
 ```
 browser  GET http://localhost:8002/          (compose) or http://demo.localhost:8080/ (k3d)
-           → no cookie  → 302 IdP /login?application_id=roku-bank-web&redirect_uri=…/callback&country=AR&asn=7303
+           → no cookie  → 302 IdP /login?client_id=rk_Bk7mQ2xVn9PwR4tL&redirect_uri=…/callback&country=AR&asn=7303
 IdP      password + PDP + ALLOW/MFA
            → 302 {redirect_uri}?code=…
 browser  GET /callback?code=…

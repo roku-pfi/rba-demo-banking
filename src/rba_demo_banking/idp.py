@@ -24,7 +24,7 @@ class HttpIdpClient(IdpClient):
     def __init__(self, settings: Settings) -> None:
         self._base = settings.idp_internal_url.rstrip("/")
         self._timeout = settings.idp_timeout_seconds
-        self._application_id = settings.application_id
+        self._client_id = settings.client_id
         self._attacker_ip = settings.attacker_ip
 
     def exchange(self, code: str) -> CallbackTokenResponse:
@@ -77,7 +77,7 @@ class HttpIdpClient(IdpClient):
                 json={
                     "email": email,
                     "password": "not-the-password",
-                    "application_id": self._application_id,
+                    "client_id": self._client_id,
                     "ip_address": self._attacker_ip,
                     "country": country,
                     "asn": asn,

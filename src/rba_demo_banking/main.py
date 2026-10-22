@@ -38,7 +38,7 @@ def _signals(settings: Settings, scenario: Scenario) -> tuple[str, str]:
 
 def login_url(settings: Settings, scenario: Scenario | None = None) -> str:
     callback = f"{settings.public_url.rstrip('/')}/callback"
-    params = {"application_id": settings.application_id, "redirect_uri": callback}
+    params = {"client_id": settings.client_id, "redirect_uri": callback}
     # Locally every request comes from a private address, so the bank pins the
     # home country/ASN to make a plain login look usual. In the cloud the IdP
     # geolocates the real address (ADR-0032); pinning would hand every visitor
