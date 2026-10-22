@@ -37,18 +37,17 @@ def _signals(settings: Settings, scenario: Scenario) -> tuple[str, str]:
 
 
 def login_url(settings: Settings, scenario: Scenario | None = None) -> str:
-    chosen = scenario or get_scenario("home")
-    assert chosen is not None
-    country, asn = _signals(settings, chosen)
     callback = f"{settings.public_url.rstrip('/')}/callback"
-    query = urlencode(
-        {
-            "application_id": settings.application_id,
-            "redirect_uri": callback,
-            "country": country,
-            "asn": asn,
-        }
-    )
+    params = {"application_id": settings.application_id, "redirect_uri": callback}
+    # Locally every request comes from a private address, so the bank pins the
+    # home country/ASN to make a plain login look usual. In the cloud the IdP
+    # geolocates the real address (ADR-0032); pinning would hand every visitor
+    # Martín's home. A walkthrough scenario still sets them on purpose.
+    if scenario is not None or settings.deployment != "cloud":
+        chosen = scenario or get_scenario("home")
+        assert chosen is not None
+        params["country"], params["asn"] = _signals(settings, chosen)
+    query = urlencode(params)
     return f"{settings.idp_public_url.rstrip('/')}/login?{query}"
 
 
