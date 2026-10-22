@@ -163,17 +163,3 @@ main { max-width: 64rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
 .done .check { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.25rem; border-radius: 50%; background: var(--lime); color: var(--pine-deep); }
 .done h1 { margin-bottom: 0.5rem; }
 .done p { color: var(--muted); margin: 0 0 2rem; }
-
-/* ---------------------------------------------------------------- presenter kit */
-
-/* Not customer chrome: plain on purpose, so nobody mistakes it for the bank. */
-body.kit { background: #fff; }
-.kit main { max-width: 52rem; }
-.kit h1 { font-size: 1.5rem; }
-.kit .tag { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #fff3cd; color: #6b5300; margin-left: 0.5rem; vertical-align: middle; }
-.kit .script { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
-.kit .scenarios { list-style: none; padding: 0; display: grid; gap: 0.75rem; }
-.kit .scenarios li { border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.25rem; }
-.kit .scenarios h2 { margin: 0 0 0.25rem; font-size: 1rem; }
-.kit .blurb, .kit .expect, .kit .meta { margin: 0.25rem 0; font-size: 0.85rem; color: var(--muted); }
-.kit .scenarios a { display: inline-block; margin-top: 0.5rem; font-weight: 700; color: var(--pine); }

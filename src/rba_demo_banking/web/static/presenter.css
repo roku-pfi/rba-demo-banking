@@ -1,0 +1,62 @@
+/* Presenter panel (D-1). Stage machinery: neither Roku Bank nor RokuSec, so it
+   wears neither. Plain dark board, system fonts, one accent for "go". */
+
+:root {
+  --bg: #111;
+  --panel: #1a1a1a;
+  --line: #2c2c2c;
+  --ink: #e8e8e8;
+  --dim: #8a8a8a;
+  --go: #e8e8e8;
+  --ok: #7fd18b;
+  --warn: #f0c35a;
+  --bad: #f07a6a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); }
+.dim { color: var(--dim); font-size: 0.85em; }
+[title] { cursor: help; }
+button[title], a[title] { cursor: pointer; }
+
+.pill { margin-left: auto; font-size: 0.75rem; padding: 0.1rem 0.55rem; border-radius: 999px; border: 1px solid var(--line); }
+.pill.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.pill.off { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+
+.gate { display: grid; place-items: center; min-height: 70vh; padding: 1rem; }
+.gate form { display: grid; gap: 0.5rem; width: min(18rem, 100%); }
+.err { color: var(--bad); margin: 0; }
+
+input, button, .button {
+  font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 0.45rem 0.8rem;
+}
+button, .button { cursor: pointer; text-decoration: none; text-align: center; white-space: nowrap; }
+button:hover, .button:hover { border-color: var(--dim); }
+button:disabled { opacity: 0.5; cursor: progress; }
+button.danger { color: var(--bad); }
+
+.board { display: grid; grid-template-columns: minmax(0, 32rem) minmax(0, 1fr); gap: 1.5rem; padding: 1rem; }
+@media (max-width: 720px) { .board { grid-template-columns: 1fr; } }
+
+h2 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); margin: 1.25rem 0 0.4rem; }
+h2:first-child { margin-top: 0; }
+h2 .dim { text-transform: none; letter-spacing: 0; }
+
+.row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 0.75rem; padding: 0.55rem 0; border-top: 1px solid var(--line); }
+.row b { display: block; font-weight: 600; }
+.expect { font: 600 0.75rem ui-monospace, 'SF Mono', Menlo, monospace; color: var(--dim); }
+
+.meter { display: flex; gap: 1rem; padding: 0.4rem 0 0.2rem; font: 0.8rem ui-monospace, 'SF Mono', Menlo, monospace; color: var(--dim); }
+
+.log ol { list-style: none; margin: 0; padding: 0; font: 0.8rem/1.5 ui-monospace, 'SF Mono', Menlo, monospace; }
+.log li { padding: 0.4rem 0; border-top: 1px solid var(--line); }
+.log li > div { color: var(--dim); }
+.log time { color: var(--dim); margin-right: 0.5rem; }
+.log .err { color: var(--bad); }
+/* From the defender's side: the attacker getting in is the failure. */
+.o-AUTHENTICATED { color: var(--bad); }
+.o-MFA_REQUIRED, .o-REAUTH_REQUIRED, .o-BLOCKED, .o-SECOND_FACTOR_MISSING { color: var(--ok); }
+.o-INVALID_CREDENTIALS { color: var(--dim); }

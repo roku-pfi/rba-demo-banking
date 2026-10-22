@@ -42,11 +42,28 @@ class Settings(BaseSettings):
     home_country: str = "AR"
     home_asn: str = "7303"
 
-    # Credential-stuffing walkthrough (ADR-0027): the account the presenter's
-    # stand-in attacker hammers, and the address it comes from. TEST-NET-2
-    # (RFC 5737) so it is never a real host.
+    # ---------------------------------------------------------------- presenter panel (D-1)
+    # Empty: open locally, absent in the cloud.
+    presenter_secret: str = ""
+    # The account the attackers go after, and its real password (the Tokyo
+    # scene logs in with it). Cloud: "martin-<IDP_SEED_PASSWORD_SUFFIX>".
     victim_email: str = "martin@correo.example"
+    victim_password: str = "martin-demo"
+    # Attacker Lambdas (I-6): "region=url,…" and their shared secret. Empty:
+    # local stand-ins post from this TEST-NET-2 address (RFC 5737).
+    attacker_urls: str = ""
+    attacker_secret: str = ""
     attacker_ip: str = "198.51.100.66"
+    # Mints impossible-travel tickets at the IdP. Empty: local, plain query.
+    simulation_secret: str = ""
+    # Reset: the profile store (the PDP's Redis / Valkey) and whose profiles.
+    redis_url: str = ""
+    profile_key_prefix: str = "rba:profile:"
+    reset_user_ids: str = "usr_rb_martin,usr_kz_martin"
+    # Load: the PDP, called directly from inside the cluster.
+    pdp_url: str = "http://localhost:8000"
+    load_seconds: int = 90
+    load_concurrency: int = 32
 
     @model_validator(mode="after")
     def _cloud_is_explicit(self) -> "Settings":

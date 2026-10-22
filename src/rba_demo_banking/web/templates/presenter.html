@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Escenario · presentador</title>
+  <link rel="stylesheet" href="/static/presenter.css">
+</head>
+<body>
+  <header>
+    <strong>Escenario</strong>
+    <span class="dim" title="Herramienta del presentador. No es parte de Roku Bank ni de RokuSec.">presentador</span>
+    <span class="pill {{ 'on' if attackers_real else 'off' }}"
+          title="{{ 'Lambdas reales en Tokio, Fráncfort y São Paulo.' if attackers_real else 'Sin Lambdas: sustitutos locales que declaran país y ASN (solo un IdP local los cree).' }}">
+      {{ 'atacantes reales' if attackers_real else 'atacantes locales' }}
+    </span>
+  </header>
+
+  {% if not authorized %}
+  <main class="gate">
+    <form method="post" action="/presenter/login">
+      <label for="secret">Clave</label>
+      <input id="secret" name="secret" type="password" autocomplete="current-password" autofocus required>
+      <button type="submit">Entrar</button>
+      {% if wrong %}<p class="err">Clave incorrecta</p>{% endif %}
+    </form>
+  </main>
+  {% else %}
+  <main class="board">
+    <section aria-label="Escenas">
+      <h2>Atacantes <span class="dim">· {{ victim }}</span></h2>
+      <div class="row">
+        <div>
+          <b>Login desde Tokio</b>
+          <span class="dim" title="La Lambda de Tokio entra con la contraseña correcta de Martín. Red de hosting en JP: el motor pide passkey y el atacante no puede seguir.">contraseña correcta · JP</span>
+        </div>
+        <span class="expect" title="Lo que debería ver Diego en Eventos.">MFA</span>
+        <button data-post="/presenter/attack/tokyo">Lanzar</button>
+      </div>
+      <div class="row">
+        <div>
+          <b>Stuffing · ráfaga</b>
+          <span class="dim" title="Una contraseña incorrecta desde cada región (3 en total). El umbral de ráfaga es 3: el próximo login de Martín pide reingresar credenciales.">3 fallos · 3 regiones</span>
+        </div>
+        <span class="expect" title="Lo que pasa en el próximo login de Martín.">REAUTH</span>
+        <button data-post="/presenter/attack/stuffing?level=burst">Lanzar</button>
+      </div>
+      <div class="row">
+        <div>
+          <b>Stuffing · sostenido</b>
+          <span class="dim" title="Cuatro contraseñas incorrectas desde cada región (12). Supera el umbral de bloqueo (10): el próximo login de Martín se bloquea.">12 fallos · 3 regiones</span>
+        </div>
+        <span class="expect" title="Lo que pasa en el próximo login de Martín.">BLOCK</span>
+        <button data-post="/presenter/attack/stuffing?level=lockout">Lanzar</button>
+      </div>
+
+      <h2>Simulado</h2>
+      <div class="row">
+        <div>
+          <b>Viaje imposible</b>
+          <span class="dim" title="Abre el login de Roku Bank con un ticket firmado que declara Japón (KDDI). Hacerlo justo después de un login normal de Martín. La consola lo marca «simulado».">JP · KDDI · ticket firmado</span>
+        </div>
+        <span class="expect">MFA</span>
+        <a class="button" href="/presenter/travel" target="_blank" rel="noopener">Abrir login</a>
+      </div>
+
+      <h2>Plataforma</h2>
+      <div class="row">
+        <div>
+          <b>Carga</b>
+          <span class="dim" title="{{ load_concurrency }} clientes concurrentes contra /risk/evaluate durante {{ load_seconds }} s. Mirar réplicas del PDP en Grafana.">{{ load_concurrency }} × {{ load_seconds }} s</span>
+        </div>
+        <span class="expect" title="Objetivo RNF-07: p95 de decisión por debajo de 200 ms.">p95 &lt; 200 ms</span>
+        <button data-post="/presenter/load">Iniciar</button>
+      </div>
+      <div class="meter" id="load" hidden>
+        <span data-k="elapsed"></span><span data-k="rps"></span><span data-k="p95"></span><span data-k="errors"></span>
+      </div>
+
+      <h2>Reiniciar</h2>
+      <div class="row">
+        <div>
+          <b>Limpiar fallos</b>
+          <span class="dim" title="Vacía la ventana de intentos fallidos de Martín en ambos tenants. Conserva su historial.">conserva historial</span>
+        </div>
+        <span></span>
+        <button data-post="/presenter/reset?mode=failures">Limpiar</button>
+      </div>
+      <div class="row">
+        <div>
+          <b>Olvidar perfil</b>
+          <span class="dim" title="Borra el perfil de Martín en ambos tenants. El próximo login es un primer login y siempre pide passkey.">próximo login = primero</span>
+        </div>
+        <span></span>
+        <button class="danger" data-post="/presenter/reset?mode=profile" data-confirm="¿Borrar el perfil de Martín?">Borrar</button>
+      </div>
+    </section>
+
+    <section aria-label="Registro" class="log">
+      <h2>Registro</h2>
+      <ol id="log"></ol>
+    </section>
+  </main>
+  <script src="/static/presenter.js"></script>
+  {% endif %}
+</body>
+</html>

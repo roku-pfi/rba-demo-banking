@@ -12,7 +12,7 @@ from rba_contracts import CallbackTokenResponse, SessionResponse, SessionToken, 
 from rba_demo_banking.config import Settings
 from rba_demo_banking.idp import IdpError
 from rba_demo_banking.main import create_app, login_url
-from rba_demo_banking.scenarios import SCENARIOS, get_scenario
+from rba_demo_banking import presenter
 
 
 # What the IdP flattens the RBAC chain down to (ADR-0029). The bank never sees
@@ -26,7 +26,6 @@ class StubIdp:
         self.codes: dict[str, str] = {"good-code": "sess-token"}
         self.sessions: dict[str, str] = {"sess-token": "martin@correo.example"}
         self.exchanges: list[str] = []
-        self.attempts: list[tuple[str, str, str]] = []
         self.permissions = (
             CUSTOMER_PERMISSIONS if permissions is None else permissions
         )
@@ -64,9 +63,6 @@ class StubIdp:
 
     def logout(self, token: str) -> None:
         self.sessions.pop(token, None)
-
-    def failed_attempt(self, email: str, *, country: str, asn: str) -> None:
-        self.attempts.append((email, country, asn))
 
 
 def _client(idp: StubIdp | None = None) -> TestClient:
@@ -137,146 +133,209 @@ def test_logout_clears_cookie() -> None:
     assert again.headers["location"].startswith("http://idp.test/login?")
 
 
-def test_home_does_not_link_walkthrough() -> None:
+def test_home_does_not_link_the_presenter_panel() -> None:
     idp = StubIdp()
     client = _client(idp)
     client.get("/callback", params={"code": "good-code"}, follow_redirects=False)
     html = client.get("/", follow_redirects=False).text
-    assert "/walkthrough" not in html
-    assert "Teleport" not in html
-    assert "VPN" not in html
+    assert "/presenter" not in html
+    assert "Escenario" not in html
 
 
-def test_walkthrough_lists_scenarios_and_is_not_the_bank() -> None:
-    html = _client().get("/walkthrough").text
-    assert "Presenter" in html
-    assert "Caja de ahorro" not in html
-    assert "risk_score" not in html
-    assert "REQUIRE_MFA" not in html
-    for row in SCENARIOS:
-        assert row.title in html
-        assert f"/walkthrough/start?scenario={row.id}" in html
-        assert f"ASN {row.asn}" in html
+# ------------------------------------------------------ presenter panel (D-1)
 
 
-def test_walkthrough_start_forwards_country_asn_and_clears_session() -> None:
-    idp = StubIdp()
-    client = _client(idp)
-    client.get("/callback", params={"code": "good-code"}, follow_redirects=False)
-    teleport = get_scenario("teleport")
-    assert teleport is not None
-    resp = client.get(
-        "/walkthrough/start",
-        params={"scenario": teleport.id},
-        follow_redirects=False,
+CLOUD = {
+    "_env_file": None,
+    "deployment": "cloud",
+    "idp_public_url": "https://auth.example",
+    "idp_internal_url": "http://idp:8001",
+    "public_url": "https://bank.example",
+}
+
+
+def _panel(**overrides) -> TestClient:
+    settings = Settings(
+        **{
+            "_env_file": None,
+            "idp_public_url": "http://idp.test",
+            "idp_internal_url": "http://idp.test",
+            "public_url": "http://bank.test",
+            **overrides,
+        }
     )
-    assert resp.status_code == 302
-    location = resp.headers["location"]
-    assert location.startswith("http://idp.test/login?")
-    assert "country=JP" in location
-    assert "asn=2516" in location
-    assert "client_id=rk_Bk7mQ2xVn9PwR4tL" in location
-    assert "sess-token" not in idp.sessions
-    home = client.get("/", follow_redirects=False)
-    assert home.status_code == 302
+    # https: in the cloud the panel's cookie is Secure.
+    return TestClient(create_app(settings, idp_client=StubIdp()), base_url="https://testserver")
 
 
-def test_walkthrough_start_unknown_scenario_stays_on_kit() -> None:
-    resp = _client().get(
-        "/walkthrough/start",
-        params={"scenario": "not-a-script"},
-        follow_redirects=False,
+def test_local_panel_without_a_secret_is_open() -> None:
+    resp = _panel().get("/presenter")
+    assert resp.status_code == 200
+    assert "Login desde Tokio" in resp.text
+    assert "atacantes locales" in resp.text
+
+
+def test_cloud_panel_without_a_secret_does_not_exist() -> None:
+    client = _panel(**CLOUD)
+    assert client.get("/presenter").status_code == 404
+    assert client.post("/presenter/attack/tokyo").status_code == 404
+    assert client.post("/presenter/login", data={"secret": ""}).status_code == 404
+
+
+def test_panel_with_a_secret_asks_for_it_first() -> None:
+    client = _panel(**CLOUD, presenter_secret="p" * 32)
+    gate = client.get("/presenter")
+    assert gate.status_code == 200
+    assert 'name="secret"' in gate.text and "Login desde Tokio" not in gate.text
+    assert client.post("/presenter/attack/tokyo").status_code == 404
+
+    wrong = client.post("/presenter/login", data={"secret": "nope"})
+    assert wrong.status_code == 401 and "Clave incorrecta" in wrong.text
+
+    ok = client.post("/presenter/login", data={"secret": "p" * 32}, follow_redirects=False)
+    assert ok.status_code == 303
+    assert "Login desde Tokio" in client.get("/presenter").text
+
+
+def test_stuffing_levels_clear_the_pdp_thresholds() -> None:
+    # The PDP's burst threshold is 3 and its lockout 10 (rba-decision-service).
+    assert presenter.STUFFING["burst"] * len(presenter.REGIONS) >= 3
+    assert presenter.STUFFING["burst"] * len(presenter.REGIONS) < 10
+    assert presenter.STUFFING["lockout"] * len(presenter.REGIONS) >= 10
+
+
+def test_stuffing_runs_every_region_with_wrong_passwords(monkeypatch) -> None:
+    seen: list[tuple[str, list[str]]] = []
+
+    def fake_run(self, region, passwords):
+        seen.append((region.id, passwords))
+        return {"region": region.id, "attempts": []}
+
+    monkeypatch.setattr(presenter.Attackers, "run", fake_run)
+    resp = _panel().post("/presenter/attack/stuffing", params={"level": "lockout"})
+    assert resp.status_code == 200
+    assert sorted(r for r, _ in seen) == sorted(r.id for r in presenter.REGIONS)
+    for _, passwords in seen:
+        assert len(passwords) == presenter.STUFFING["lockout"]
+        assert "martin-demo" not in passwords
+
+
+def test_stuffing_rejects_an_unknown_level() -> None:
+    assert _panel().post("/presenter/attack/stuffing", params={"level": "x"}).status_code == 400
+
+
+def test_tokyo_uses_the_real_password_from_tokyo(monkeypatch) -> None:
+    seen = []
+    monkeypatch.setattr(
+        presenter.Attackers, "run", lambda self, region, pw: seen.append((region.id, pw)) or {"attempts": []}
     )
-    assert resp.status_code == 302
-    assert resp.headers["location"] == "/walkthrough"
+    _panel().post("/presenter/attack/tokyo")
+    assert seen == [("ap-northeast-1", ["martin-demo"])]
 
 
-def test_ordinary_scenario_fires_no_attack() -> None:
-    idp = StubIdp()
-    client = _client(idp)
-    client.get(
-        "/walkthrough/start", params={"scenario": "home"}, follow_redirects=False
+def test_attacker_urls_parse() -> None:
+    urls = presenter.parse_attacker_urls(
+        "ap-northeast-1=https://a.lambda-url.ap-northeast-1.on.aws/, sa-east-1=https://c/"
     )
-    assert idp.attempts == []
+    assert urls == {
+        "ap-northeast-1": "https://a.lambda-url.ap-northeast-1.on.aws/",
+        "sa-east-1": "https://c/",
+    }
 
 
-def test_stuffing_burst_fires_wrong_passwords_then_hands_over_the_login() -> None:
-    """The presenter kit plays the attacker; the real login is still done by hand."""
-    idp = StubIdp()
-    client = _client(idp)
-    resp = client.get(
-        "/walkthrough/start",
-        params={"scenario": "stuffing_burst"},
-        follow_redirects=False,
+def test_lambda_attack_sends_the_secret_and_the_bank_client(monkeypatch) -> None:
+    calls = []
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {"egress_ip": "13.112.0.1", "attempts": [{"outcome": "MFA_REQUIRED"}]}
+
+    def fake_post(url, json, headers, timeout):
+        calls.append((url, json, headers))
+        return Resp()
+
+    monkeypatch.setattr(presenter.httpx, "post", fake_post)
+    settings = Settings(_env_file=None, attacker_urls="ap-northeast-1=https://tokyo/", attacker_secret="s3")
+    out = presenter.Attackers(settings).tokyo()[0]
+    assert out["real"] and out["egress_ip"] == "13.112.0.1"
+    url, body, headers = calls[0]
+    assert url == "https://tokyo/"
+    assert headers == {"X-RokuSec-Attacker-Secret": "s3"}
+    assert body["client_id"] == settings.client_id and body["passwords"] == ["martin-demo"]
+
+
+def test_travel_with_a_secret_carries_a_ticket_not_a_country(monkeypatch) -> None:
+    monkeypatch.setattr(presenter, "travel_ticket", lambda settings: "signed.ticket")
+    resp = _panel(**CLOUD, presenter_secret="p" * 32, simulation_secret="x" * 32)
+    resp.post("/presenter/login", data={"secret": "p" * 32})
+    out = resp.get("/presenter/travel", follow_redirects=False)
+    assert out.status_code == 302
+    location = out.headers["location"]
+    assert location.startswith("https://auth.example/login?")
+    assert "simulation_ticket=signed.ticket" in location
+    assert "country=" not in location
+
+
+def test_local_travel_states_the_country() -> None:
+    url = presenter.travel_login_url(
+        Settings(_env_file=None, idp_public_url="http://idp.test", public_url="http://bank.test"), None
     )
-    assert len(idp.attempts) == 4
-    assert idp.attempts[0] == ("martin@correo.example", "AR", "7303")
-    assert len({a for a in idp.attempts}) == 1
-
-    assert resp.status_code == 302
-    location = resp.headers["location"]
-    assert location.startswith("http://idp.test/login?")
-    # The presenter's own login must arrive from the same context as the attack.
-    assert "country=AR" in location
-    assert "asn=7303" in location
+    assert "country=JP" in url and "asn=2516" in url
 
 
-def test_stuffing_runs_from_the_users_ordinary_context() -> None:
-    """The whole point of ADR-0027: Freeman must NOT be able to see this.
+class FakeRedis:
+    def __init__(self, data: dict[str, str]) -> None:
+        self.data = data
 
-    If the attack runs from a novel country/ASN, Freeman scores it CRITICAL on
-    novelty alone and BLOCKs before the failed-login band is ever consulted —
-    the demo then proves nothing about credential stuffing. Keep the context
-    identical to `home` so the failure count is the only thing that moves.
-    """
-    home = get_scenario("home")
-    assert home is not None
-    for scenario_id in ("stuffing_burst", "stuffing_lockout"):
-        row = get_scenario(scenario_id)
-        assert row is not None
-        assert (row.country, row.asn) == (home.country, home.asn), scenario_id
+    def get(self, key):
+        return self.data.get(key)
+
+    def set(self, key, value):
+        self.data[key] = value
+
+    def delete(self, key):
+        return 1 if self.data.pop(key, None) is not None else 0
 
 
-def test_stuffing_lockout_crosses_the_lockout_band() -> None:
-    idp = StubIdp()
-    client = _client(idp)
-    client.get(
-        "/walkthrough/start",
-        params={"scenario": "stuffing_lockout"},
-        follow_redirects=False,
+def _fake_redis(monkeypatch, data):
+    import json as _json
+    import redis
+
+    store = FakeRedis({k: _json.dumps(v) for k, v in data.items()})
+    monkeypatch.setattr(redis.Redis, "from_url", classmethod(lambda cls, *a, **k: store))
+    return store
+
+
+def test_reset_failures_keeps_the_history(monkeypatch) -> None:
+    import json as _json
+
+    store = _fake_redis(
+        monkeypatch,
+        {"rba:profile:usr_rb_martin": {"login_count": 40, "failed_login_ts": [1.0, 2.0]}},
     )
-    # The PDP's lockout threshold is 10; the scenario must clear it, not graze it.
-    assert len(idp.attempts) == 12
+    out = presenter.reset(Settings(_env_file=None, redis_url="redis://x"), "failures")
+    assert out["users"] == ["usr_rb_martin"]
+    blob = _json.loads(store.data["rba:profile:usr_rb_martin"])
+    assert blob == {"login_count": 40, "failed_login_ts": []}
 
 
-def test_attack_failure_does_not_break_the_walkthrough() -> None:
-    class BrokenIdp(StubIdp):
-        def failed_attempt(self, email: str, *, country: str, asn: str) -> None:
-            raise IdpError("IdP unavailable")
-
-    resp = _client(BrokenIdp()).get(
-        "/walkthrough/start",
-        params={"scenario": "stuffing_burst"},
-        follow_redirects=False,
-    )
-    assert resp.status_code == 302
-    assert resp.headers["location"].startswith("http://idp.test/login?")
+def test_reset_profile_forgets_it(monkeypatch) -> None:
+    store = _fake_redis(monkeypatch, {"rba:profile:usr_kz_martin": {"login_count": 3}})
+    out = presenter.reset(Settings(_env_file=None, redis_url="redis://x"), "profile")
+    assert out["users"] == ["usr_kz_martin"]
+    assert store.data == {}
 
 
-def test_stuffing_scenarios_never_carry_a_real_password() -> None:
-    """The bank does not know the victim's password and must not appear to."""
-    html = _client().get("/walkthrough").text
-    assert "martin-demo" not in html
+def test_reset_without_a_store_says_so() -> None:
+    out = presenter.reset(Settings(_env_file=None), "failures")
+    assert out["done"] is False
 
 
-def test_login_url_uses_scenario_signals() -> None:
-    settings = Settings(idp_public_url="http://idp.test", public_url="http://bank.test")
-    vpn = get_scenario("vpn")
-    assert vpn is not None
-    url = login_url(settings, vpn)
-    assert "country=US" in url
-    assert "asn=13335" in url
-    assert "risk" not in url
+def test_load_snapshot_before_any_run() -> None:
+    snap = presenter.LoadRun().snapshot()
+    assert snap["running"] is False and snap["sent"] == 0 and snap["p95_ms"] is None
 
 
 # ------------------------------------------------------ RBAC enforcement (RF-21)
@@ -413,5 +472,3 @@ def test_cloud_login_link_does_not_pin_the_home_location() -> None:
     )
     url = login_url(settings)
     assert "country=" not in url and "asn=" not in url
-    # A walkthrough scenario is a deliberate override (labelled simulated, C-3).
-    assert "country=" in login_url(settings, get_scenario("new_country"))

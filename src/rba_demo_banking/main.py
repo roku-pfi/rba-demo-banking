@@ -6,14 +6,14 @@ import logging
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from rba_demo_banking.config import Settings, get_settings
 from rba_demo_banking.idp import HttpIdpClient, IdpClient, IdpError
-from rba_demo_banking.scenarios import SCENARIOS, Scenario, get_scenario
+from rba_demo_banking import presenter
 
 logger = logging.getLogger(__name__)
 
@@ -52,23 +52,15 @@ PERM_ACCOUNT_READ = "account:read"
 PERM_TRANSFER_CREATE = "transfer:create"
 
 
-def _signals(settings: Settings, scenario: Scenario) -> tuple[str, str]:
-    if scenario.id == "home":
-        return settings.home_country, settings.home_asn
-    return scenario.country, scenario.asn
-
-
-def login_url(settings: Settings, scenario: Scenario | None = None) -> str:
+def login_url(settings: Settings) -> str:
     callback = f"{settings.public_url.rstrip('/')}/callback"
     params = {"client_id": settings.client_id, "redirect_uri": callback}
     # Locally every request comes from a private address, so the bank pins the
     # home country/ASN to make a plain login look usual. In the cloud the IdP
     # geolocates the real address (ADR-0032); pinning would hand every visitor
-    # Martín's home. A walkthrough scenario still sets them on purpose.
-    if scenario is not None or settings.deployment != "cloud":
-        chosen = scenario or get_scenario("home")
-        assert chosen is not None
-        params["country"], params["asn"] = _signals(settings, chosen)
+    # Martín's home.
+    if settings.deployment != "cloud":
+        params["country"], params["asn"] = settings.home_country, settings.home_asn
     query = urlencode(params)
     return f"{settings.idp_public_url.rstrip('/')}/login?{query}"
 
@@ -101,31 +93,6 @@ def create_app(
         token = request.cookies.get(settings.session_cookie)
         if token:
             idp.logout(token)
-
-    def _run_attack(scenario: Scenario) -> None:
-        """Fire the scenario's wrong-password burst before the presenter logs in.
-
-        Sequential and small (≤12): this is a demo of a *signal*, not a load
-        test, and each attempt has to be recorded before the next real login is
-        scored. Best effort — a failure here should spoil the scenario, not the
-        walkthrough.
-        """
-        for _ in range(scenario.failed_attempts):
-            try:
-                idp.failed_attempt(
-                    settings.victim_email,
-                    country=scenario.country,
-                    asn=scenario.asn,
-                )
-            except IdpError:
-                logger.warning("attack step dropped for scenario=%s", scenario.id)
-
-    def _start_login(request: Request, scenario: Scenario) -> Response:
-        _abandon_session(request)
-        _run_attack(scenario)
-        response = RedirectResponse(login_url(settings, scenario), status_code=302)
-        response.delete_cookie(settings.session_cookie, path="/")
-        return response
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -214,21 +181,96 @@ def create_app(
             context={"email": session.user.email, "name": display_name(session.user.email), "transfer": TRANSFER, "sent": True, "can_transfer": True},
         )
 
-    @app.get("/walkthrough")
-    def walkthrough(request: Request):
-        """Presenter kit — not linked from the customer home (ADR-0023)."""
+    # ---------------------------------------------------------------- presenter panel (D-1)
+
+    attackers = presenter.Attackers(settings)
+    load = presenter.LoadRun()
+
+    def _presenter(request: Request) -> None:
+        """Every panel action starts here. Same 404 whether off or not signed in."""
+        if not presenter.enabled(settings) or not presenter.authorized(
+            settings, request.cookies.get(presenter.COOKIE)
+        ):
+            raise HTTPException(status_code=404, detail="not found")
+
+    def _panel(request: Request, *, wrong: bool = False, status_code: int = 200):
+        if not presenter.enabled(settings):
+            raise HTTPException(status_code=404, detail="not found")
         return templates.TemplateResponse(
             request=request,
-            name="walkthrough.html",
-            context={"scenarios": SCENARIOS},
+            name="presenter.html",
+            status_code=status_code,
+            context={
+                "authorized": presenter.authorized(settings, request.cookies.get(presenter.COOKIE)),
+                "wrong": wrong,
+                "attackers_real": attackers.real,
+                "victim": settings.victim_email,
+                "load_seconds": settings.load_seconds,
+                "load_concurrency": settings.load_concurrency,
+            },
         )
 
-    @app.get("/walkthrough/start")
-    def walkthrough_start(request: Request, scenario: str = "home"):
-        chosen = get_scenario(scenario)
-        if chosen is None:
-            return RedirectResponse("/walkthrough", status_code=302)
-        return _start_login(request, chosen)
+    @app.get("/presenter")
+    def presenter_panel(request: Request):
+        """Not linked from the customer home (ADR-0023)."""
+        return _panel(request)
+
+    @app.post("/presenter/login")
+    def presenter_login(request: Request, secret: str = Form("")):
+        if not presenter.enabled(settings):
+            raise HTTPException(status_code=404, detail="not found")
+        value = presenter.cookie_value(settings, secret)
+        if value is None:
+            return _panel(request, wrong=True, status_code=401)
+        response = RedirectResponse("/presenter", status_code=303)
+        response.set_cookie(presenter.COOKIE, value, **{**_cookie_kwargs(), "path": "/presenter", "samesite": "strict"})
+        return response
+
+    @app.post("/presenter/attack/tokyo")
+    def presenter_tokyo(request: Request) -> dict:
+        _presenter(request)
+        return {"regions": attackers.tokyo()}
+
+    @app.post("/presenter/attack/stuffing")
+    def presenter_stuffing(request: Request, level: str = "burst") -> dict:
+        _presenter(request)
+        if level not in presenter.STUFFING:
+            raise HTTPException(status_code=400, detail="level: burst | lockout")
+        return {"regions": attackers.stuffing(presenter.STUFFING[level])}
+
+    @app.get("/presenter/travel")
+    def presenter_travel(request: Request):
+        _presenter(request)
+        _abandon_session(request)
+        try:
+            ticket = presenter.travel_ticket(settings)
+        except Exception as exc:
+            logger.warning("simulation ticket refused: %s", exc)
+            raise HTTPException(status_code=502, detail="el IdP no emitió el ticket") from exc
+        response = RedirectResponse(presenter.travel_login_url(settings, ticket), status_code=302)
+        response.delete_cookie(settings.session_cookie, path="/")
+        return response
+
+    @app.post("/presenter/load")
+    def presenter_load_start(request: Request) -> dict:
+        _presenter(request)
+        return {"load": True, "started": load.start(settings)}
+
+    @app.get("/presenter/load")
+    def presenter_load_status(request: Request) -> dict:
+        _presenter(request)
+        return load.snapshot()
+
+    @app.post("/presenter/reset")
+    def presenter_reset(request: Request, mode: str = "failures") -> dict:
+        _presenter(request)
+        if mode not in ("failures", "profile"):
+            raise HTTPException(status_code=400, detail="mode: failures | profile")
+        try:
+            return {"reset": presenter.reset(settings, mode)}
+        except Exception as exc:
+            logger.warning("reset failed: %s", exc)
+            return {"reset": {"done": False, "users": [], "error": "sin acceso al almacén de perfiles"}}
 
     @app.get("/callback")
     def callback(code: str | None = None):
