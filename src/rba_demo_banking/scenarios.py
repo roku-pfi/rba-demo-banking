@@ -68,7 +68,7 @@ SCENARIOS: tuple[Scenario, ...] = (
         id="stuffing_burst",
         title="Credential stuffing — burst",
         blurb=(
-            "Fires 4 wrong passwords at demo@example.com, then opens the login "
+            "Fires 4 wrong passwords at martin@correo.example, then opens the login "
             "page. Deliberately from the user's OWN country and ASN — a "
             "residential proxy, which is what stuffing actually looks like. "
             "Freeman scores this 0.00: nothing about the context is novel "

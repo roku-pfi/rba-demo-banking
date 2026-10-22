@@ -20,7 +20,7 @@ Package version: **0.2.0**. Pins `rba-contracts` ≥ 0.5.0.
 
 ```
 browser  GET http://localhost:8002/          (compose) or http://demo.localhost:8080/ (k3d)
-           → no cookie  → 302 IdP /login?application_id=demo-banking-app&redirect_uri=…/callback&country=AR&asn=7303
+           → no cookie  → 302 IdP /login?application_id=roku-bank-web&redirect_uri=…/callback&country=AR&asn=7303
 IdP      password + PDP + ALLOW/MFA
            → 302 {redirect_uri}?code=…
 browser  GET /callback?code=…
@@ -84,7 +84,7 @@ PUBLIC_URL=http://localhost:8002 \
 uvicorn rba_demo_banking.main:app --reload --port 8002
 ```
 
-Open http://localhost:8002 — sign in as `demo@example.com` / `demo-password`.
+Open http://localhost:8002 — sign in as `martin@correo.example` / `martin-demo`.
 Presenter kit: http://localhost:8002/walkthrough.
 
 ## Cluster

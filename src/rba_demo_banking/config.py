@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # This app's public origin (registered redirect_uri).
     public_url: str = "http://localhost:8002"
 
-    application_id: str = "demo-banking-app"
+    application_id: str = "roku-bank-web"
     session_cookie: str = "rba_demo_session"
     idp_timeout_seconds: float = 2.0
 
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Credential-stuffing walkthrough (ADR-0027): the account the presenter's
     # stand-in attacker hammers, and the address it comes from. TEST-NET-2
     # (RFC 5737) so it is never a real host.
-    victim_email: str = "demo@example.com"
+    victim_email: str = "martin@correo.example"
     attacker_ip: str = "198.51.100.66"
 
 

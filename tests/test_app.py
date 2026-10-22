@@ -22,7 +22,7 @@ VIEWER_PERMISSIONS = ["account:read", "transaction:read"]
 class StubIdp:
     def __init__(self, permissions: list[str] | None = None) -> None:
         self.codes: dict[str, str] = {"good-code": "sess-token"}
-        self.sessions: dict[str, str] = {"sess-token": "demo@example.com"}
+        self.sessions: dict[str, str] = {"sess-token": "martin@correo.example"}
         self.exchanges: list[str] = []
         self.attempts: list[tuple[str, str, str]] = []
         self.permissions = (
@@ -37,8 +37,9 @@ class StubIdp:
                 token=token, expires_at=datetime(2026, 8, 17, tzinfo=timezone.utc)
             ),
             user=UserPublic(
-                user_id="usr_demo",
-                email="demo@example.com",
+                tenant_id="roku-bank",
+                user_id="usr_rb_martin",
+                email="martin@correo.example",
                 created_at=datetime(2026, 8, 15, tzinfo=timezone.utc),
                 is_admin=False,
             ),
@@ -48,13 +49,14 @@ class StubIdp:
         email = self.sessions[token]
         return SessionResponse(
             user=UserPublic(
-                user_id="usr_demo",
+                tenant_id="roku-bank",
+                user_id="usr_rb_martin",
                 email=email,
                 created_at=datetime(2026, 8, 15, tzinfo=timezone.utc),
                 is_admin=False,
             ),
             expires_at=datetime(2026, 8, 17, tzinfo=timezone.utc),
-            application_id="demo-banking-app",
+            application_id="roku-bank-web",
             permissions=list(self.permissions),
         )
 
@@ -83,7 +85,7 @@ def test_anonymous_home_redirects_to_idp() -> None:
     assert resp.status_code == 302
     location = resp.headers["location"]
     assert location.startswith("http://idp.test/login?")
-    assert "application_id=demo-banking-app" in location
+    assert "application_id=roku-bank-web" in location
     assert "redirect_uri=http%3A%2F%2Fbank.test%2Fcallback" in location
     assert "country=AR" in location
     assert "asn=7303" in location
@@ -108,7 +110,7 @@ def test_callback_sets_cookie_and_home_is_opaque() -> None:
     home = client.get("/", follow_redirects=False)
     assert home.status_code == 200
     html = home.text
-    assert "demo@example.com" in html
+    assert "martin@correo.example" in html
     assert "Everyday" in html
     assert "Roku Bank" in html
     for forbidden in (
@@ -171,7 +173,7 @@ def test_walkthrough_start_forwards_country_asn_and_clears_session() -> None:
     assert location.startswith("http://idp.test/login?")
     assert "country=JP" in location
     assert "asn=2516" in location
-    assert "application_id=demo-banking-app" in location
+    assert "application_id=roku-bank-web" in location
     assert "sess-token" not in idp.sessions
     home = client.get("/", follow_redirects=False)
     assert home.status_code == 302
@@ -206,7 +208,7 @@ def test_stuffing_burst_fires_wrong_passwords_then_hands_over_the_login() -> Non
         follow_redirects=False,
     )
     assert len(idp.attempts) == 4
-    assert idp.attempts[0] == ("demo@example.com", "AR", "7303")
+    assert idp.attempts[0] == ("martin@correo.example", "AR", "7303")
     assert len({a for a in idp.attempts}) == 1
 
     assert resp.status_code == 302
@@ -262,7 +264,7 @@ def test_attack_failure_does_not_break_the_walkthrough() -> None:
 def test_stuffing_scenarios_never_carry_a_real_password() -> None:
     """The bank does not know the victim's password and must not appear to."""
     html = _client().get("/walkthrough").text
-    assert "demo-password" not in html
+    assert "martin-demo" not in html
 
 
 def test_login_url_uses_scenario_signals() -> None:
