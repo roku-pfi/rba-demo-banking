@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from rba_contracts import CallbackTokenResponse, SessionResponse, SessionToken, UserPublic
 
 from rba_demo_banking.config import Settings
@@ -349,3 +351,45 @@ def test_theme_and_fonts_are_served() -> None:
     served = client.get("/static/fonts/instrument-sans-400700-latin.woff2")
     assert served.status_code == 200
     assert served.content[:4] == b"wOF2"
+
+
+# ------------------------------------------------------------- C-1: cloud settings
+
+
+def test_cloud_marks_the_session_cookie_secure() -> None:
+    settings = Settings(
+        _env_file=None,
+        deployment="cloud",
+        idp_public_url="https://d1fg623tjiucw7.cloudfront.net",
+        idp_internal_url="http://idp.rba.svc.cluster.local:8001",
+        public_url="https://d3m6kfm1gma0g6.cloudfront.net",
+    )
+    assert settings.cookie_secure is True
+    client = TestClient(create_app(settings, idp_client=StubIdp()), base_url="https://testserver")
+    resp = client.get("/callback", params={"code": "good-code"}, follow_redirects=False)
+    cookie = resp.headers["set-cookie"].lower()
+    assert "secure" in cookie and "httponly" in cookie
+
+
+def test_local_cookie_is_not_secure() -> None:
+    resp = _client().get("/callback", params={"code": "good-code"}, follow_redirects=False)
+    assert "secure" not in resp.headers["set-cookie"].lower()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"public_url": "http://d3m6kfm1gma0g6.cloudfront.net"},
+        {"idp_public_url": "http://localhost:8001"},
+        {"idp_internal_url": "http://localhost:8001"},
+    ],
+)
+def test_cloud_refuses_local_urls(override: dict) -> None:
+    base = {
+        "deployment": "cloud",
+        "idp_public_url": "https://d1fg623tjiucw7.cloudfront.net",
+        "idp_internal_url": "http://idp:8001",
+        "public_url": "https://d3m6kfm1gma0g6.cloudfront.net",
+    }
+    with pytest.raises(ValidationError, match="DEPLOYMENT=cloud"):
+        Settings(_env_file=None, **{**base, **override})
