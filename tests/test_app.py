@@ -393,3 +393,17 @@ def test_cloud_refuses_local_urls(override: dict) -> None:
     }
     with pytest.raises(ValidationError, match="DEPLOYMENT=cloud"):
         Settings(_env_file=None, **{**base, **override})
+
+
+def test_cloud_login_link_does_not_pin_the_home_location() -> None:
+    settings = Settings(
+        _env_file=None,
+        deployment="cloud",
+        idp_public_url="https://d1fg623tjiucw7.cloudfront.net",
+        idp_internal_url="http://idp:8001",
+        public_url="https://d3m6kfm1gma0g6.cloudfront.net",
+    )
+    url = login_url(settings)
+    assert "country=" not in url and "asn=" not in url
+    # A walkthrough scenario is a deliberate override (labelled simulated, C-3).
+    assert "country=" in login_url(settings, get_scenario("new_country"))
