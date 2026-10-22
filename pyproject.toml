@@ -35,6 +35,7 @@ rba_demo_banking = [
   "web/static/*",
   # The self-hosted woff2 files; "web/static/*" does not reach into it.
   "web/static/fonts/*",
+  "web/static/brand/*",
 ]
 
 [tool.pytest.ini_options]

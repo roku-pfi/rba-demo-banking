@@ -19,10 +19,32 @@ logger = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
+def ars(amount: float, *, signed: bool = False) -> str:
+    """$ 1.234.567,89 — es-AR grouping, without depending on the OS locale."""
+    whole, cents = f"{abs(amount):,.2f}".split(".")
+    sign = ("+ " if amount > 0 else "− " if amount < 0 else "") if signed else ("−" if amount < 0 else "")
+    return f"{sign}$ {whole.replace(',', '.')},{cents}"
+
+
+# Demo data: what a customer sees once signed in. Nothing here is real.
 BALANCES = (
-    {"name": "Everyday", "number": "···· 4412", "amount": "AR$ 248.320,15"},
-    {"name": "Savings", "number": "···· 9081", "amount": "AR$ 1.502.000,00"},
+    {"name": "Caja de ahorro en pesos", "number": "···· 4412", "amount": ars(248_320.15)},
+    {"name": "Cuenta ahorro", "number": "···· 9081", "amount": ars(1_502_000.00)},
 )
+TOTAL = ars(248_320.15 + 1_502_000.00)
+MOVEMENTS = (
+    {"who": "Supermercado Día", "what": "Compra con débito", "when": "Hoy", "amount": ars(-12_430.00, signed=True), "icon": "S"},
+    {"who": "Sofía Paz", "what": "Transferencia recibida", "when": "Ayer", "amount": ars(25_000.00, signed=True), "icon": "SP"},
+    {"who": "Edesur", "what": "Pago de servicio", "when": "Ayer", "amount": ars(-18_760.40, signed=True), "icon": "E"},
+    {"who": "Sueldo · Kaze Labs", "what": "Acreditación", "when": "1 oct", "amount": ars(1_180_000.00, signed=True), "icon": "K"},
+    {"who": "Spotify", "what": "Suscripción", "when": "30 sep", "amount": ars(-4_299.00, signed=True), "icon": "S"},
+)
+TRANSFER = {"to": "Sofía Paz", "bank": "Roku Bank", "account": "···· 9081", "amount": ars(12_500.00)}
+
+
+def display_name(email: str) -> str:
+    """The greeting's name: the address's local part, capitalised."""
+    return email.split("@", 1)[0].replace(".", " ").title()
 
 # Permissions this relying party asks about (ADR-0029). The bank never sees a
 # role or a group — the IdP flattens the chain and hands over scope strings.
@@ -126,9 +148,12 @@ def create_app(
             name="home.html",
             context={
                 "email": session.user.email,
+                "name": display_name(session.user.email),
                 # A signed-in user without `account:read` sees the shell and no
                 # balances — sign-in and visibility are separate grants.
                 "balances": BALANCES if PERM_ACCOUNT_READ in permissions else (),
+                "total": TOTAL,
+                "movements": MOVEMENTS if PERM_ACCOUNT_READ in permissions else (),
                 "can_transfer": PERM_TRANSFER_CREATE in permissions,
                 # Shown on the page: what the bank was handed, verbatim.
                 "permissions": sorted(permissions),
@@ -158,7 +183,9 @@ def create_app(
                 status_code=403,
                 context={
                     "email": session.user.email,
+                    "name": display_name(session.user.email),
                     "permission": permission,
+                    "can_transfer": PERM_TRANSFER_CREATE in set(session.permissions),
                 },
             )
         return session, None
@@ -171,7 +198,7 @@ def create_app(
         return templates.TemplateResponse(
             request=request,
             name="transfer.html",
-            context={"email": session.user.email, "sent": None},
+            context={"email": session.user.email, "name": display_name(session.user.email), "transfer": TRANSFER, "sent": False, "can_transfer": True},
         )
 
     @app.post("/transfer")
@@ -184,7 +211,7 @@ def create_app(
         return templates.TemplateResponse(
             request=request,
             name="transfer.html",
-            context={"email": session.user.email, "sent": "AR$ 12.500,00"},
+            context={"email": session.user.email, "name": display_name(session.user.email), "transfer": TRANSFER, "sent": True, "can_transfer": True},
         )
 
     @app.get("/walkthrough")

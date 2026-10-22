@@ -1,33 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Roku Bank</title>
-  <link rel="stylesheet" href="/static/theme.css">
-  <link rel="stylesheet" href="/static/home.css">
-</head>
-<body>
-  <header class="top">
-    <div class="brand"><p class="mark">Roku Bank</p></div>
-    <div class="who">
-      <span>{{ email }}</span>
-      <form method="post" action="/logout">
-        <button type="submit">Sign out</button>
-      </form>
-    </div>
-  </header>
-  <main class="sheet">
-    <p class="hello">Signed in as {{ email }}</p>
-    <h1>Not available</h1>
-    <p class="empty">
-      Your access does not include this operation. If you need it, ask an
-      administrator to change your role.
-    </p>
+{% extends "base.html" %}
+{% block title %}No disponible · Roku Bank{% endblock %}
+{% block main %}
+  <div class="flow">
+    <h1>No disponible</h1>
+    <p class="note">Tu acceso no incluye esta operación. Si la necesitás, pedile a un administrador que cambie tu rol.</p>
     {# Naming the scope is deliberate: it is not a secret, and it turns "it
        doesn't work" into a ticket an operator can act on. #}
-    <p class="empty muted">Required <span class="scope">{{ permission }}</span></p>
-    <p><a class="action secondary" href="/">Back to accounts</a></p>
-  </main>
-</body>
-</html>
+    <p class="perms">Requiere <code>{{ permission }}</code></p>
+    <a class="button ghost" href="/">Volver al inicio</a>
+  </div>
+{% endblock %}

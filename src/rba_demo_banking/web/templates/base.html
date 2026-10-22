@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Roku Bank{% endblock %}</title>
+  <link rel="icon" href="/static/brand/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/bank.css">
+</head>
+<body>
+  <header class="top">
+    <a class="logo" href="/"><img src="/static/brand/roku-bank-mark.svg" alt="">Roku Bank</a>
+    <nav class="nav" aria-label="Secciones">
+      <a href="/"{% if active == 'home' %} aria-current="page"{% endif %}>Inicio</a>
+      {% if can_transfer %}<a href="/transfer"{% if active == 'transfer' %} aria-current="page"{% endif %}>Transferir</a>{% endif %}
+    </nav>
+    <details class="me">
+      <summary><span class="avatar" aria-hidden="true">{{ name[:1] }}</span><span>{{ name }}</span></summary>
+      <div class="me-menu">
+        <div class="email">{{ email }}</div>
+        <form method="post" action="/logout"><button type="submit">Cerrar sesión</button></form>
+      </div>
+    </details>
+  </header>
+  <main>
+    {% block main %}{% endblock %}
+  </main>
+</body>
+</html>

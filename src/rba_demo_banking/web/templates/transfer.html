@@ -1,39 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Roku Bank</title>
-  <link rel="stylesheet" href="/static/theme.css">
-  <link rel="stylesheet" href="/static/home.css">
-</head>
-<body>
-  <header class="top">
-    <div class="brand"><p class="mark">Roku Bank</p></div>
-    <div class="who">
-      <span>{{ email }}</span>
-      <form method="post" action="/logout">
-        <button type="submit">Sign out</button>
-      </form>
+{% extends "base.html" %}
+{% set active = 'transfer' %}
+{% block title %}Transferir · Roku Bank{% endblock %}
+{% block main %}
+  <div class="flow">
+  {% if sent %}
+    <div class="done">
+      <div class="check"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h1>Transferencia enviada</h1>
+      <p>{{ transfer.amount }} a {{ transfer.to }}</p>
+      <a class="button" href="/">Volver al inicio</a>
     </div>
-  </header>
-  <main class="sheet">
-    <p class="hello">Signed in as {{ email }}</p>
-    <h1>Send money</h1>
-    {% if sent %}
-    <p class="sent">Sent {{ sent }} to ···· 9081.</p>
-    {% else %}
-    <form method="post" action="/transfer" class="transfer">
-      <label>To account
-        <input name="to" value="···· 9081" readonly>
-      </label>
-      <label>Amount
-        <input name="amount" value="AR$ 12.500,00" readonly>
-      </label>
-      <button type="submit">Send</button>
+  {% else %}
+    <h1>Transferir</h1>
+    <section class="card">
+      <div class="to">
+        <span class="avatar" aria-hidden="true">{{ transfer.to[:1] }}</span>
+        <span class="rows"><span class="main" style="display:block;font-weight:700">{{ transfer.to }}</span><span class="sub" style="color:var(--muted);font-size:.85rem">{{ transfer.bank }} · {{ transfer.account }}</span></span>
+      </div>
+    </section>
+    <div class="big-amount">{{ transfer.amount }}</div>
+    <div class="from">Desde Caja de ahorro en pesos ···· 4412</div>
+    <form method="post" action="/transfer">
+      <button class="button" type="submit">Transferir</button>
     </form>
-    {% endif %}
-    <a class="action secondary" href="/">Back to accounts</a>
-  </main>
-</body>
-</html>
+    <a class="button ghost" href="/" style="margin-top:.5rem">Cancelar</a>
+  {% endif %}
+  </div>
+{% endblock %}

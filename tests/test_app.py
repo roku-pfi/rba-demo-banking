@@ -113,7 +113,7 @@ def test_callback_sets_cookie_and_home_is_opaque() -> None:
     assert home.status_code == 200
     html = home.text
     assert "martin@correo.example" in html
-    assert "Everyday" in html
+    assert "Caja de ahorro en pesos" in html
     assert "Roku Bank" in html
     for forbidden in (
         "risk_score",
@@ -150,7 +150,7 @@ def test_home_does_not_link_walkthrough() -> None:
 def test_walkthrough_lists_scenarios_and_is_not_the_bank() -> None:
     html = _client().get("/walkthrough").text
     assert "Presenter" in html
-    assert "Everyday" not in html
+    assert "Caja de ahorro" not in html
     assert "risk_score" not in html
     assert "REQUIRE_MFA" not in html
     for row in SCENARIOS:
@@ -291,16 +291,16 @@ def _signed_in(idp: StubIdp) -> TestClient:
 
 def test_customer_sees_balances_and_the_transfer_action() -> None:
     html = _signed_in(StubIdp()).get("/").text
-    assert "Everyday" in html
-    assert "Send money" in html
+    assert "Caja de ahorro en pesos" in html
+    assert 'href="/transfer"' in html
 
 
 def test_viewer_sees_balances_but_no_transfer_action() -> None:
     """Same application, same login, one permission short."""
     html = _signed_in(StubIdp(VIEWER_PERMISSIONS)).get("/").text
-    assert "Everyday" in html
-    assert "Send money" not in html
-    assert "read-only" in html
+    assert "Caja de ahorro en pesos" in html
+    assert 'href="/transfer"' not in html
+    assert "solo consulta" in html
 
 
 def test_viewer_is_refused_the_transfer_page() -> None:
@@ -317,20 +317,20 @@ def test_viewer_is_refused_the_transfer_post() -> None:
     """
     resp = _signed_in(StubIdp(VIEWER_PERMISSIONS)).post("/transfer")
     assert resp.status_code == 403
-    assert "Sent" not in resp.text
+    assert "Transferencia enviada" not in resp.text
 
 
 def test_customer_can_complete_a_transfer() -> None:
     resp = _signed_in(StubIdp()).post("/transfer")
     assert resp.status_code == 200
-    assert "Sent" in resp.text
+    assert "Transferencia enviada" in resp.text
 
 
 def test_account_read_gates_the_balances() -> None:
     """Signing in and being allowed to see money are separate grants."""
     html = _signed_in(StubIdp(["transaction:read"])).get("/").text
-    assert "Everyday" not in html
-    assert "No accounts are visible" in html
+    assert "Caja de ahorro" not in html
+    assert "No tenés cuentas visibles" in html
 
 
 def test_transfer_without_a_session_redirects_to_login() -> None:
@@ -339,18 +339,26 @@ def test_transfer_without_a_session_redirects_to_login() -> None:
     assert resp.headers["location"].startswith("http://idp.test/login?")
 
 
-def test_theme_and_fonts_are_served() -> None:
-    """The bank carries its own copy of the shared theme (it is a separate
-    deployable). A 404 here is silent, so it is asserted rather than eyeballed."""
+def test_brand_styles_and_fonts_are_served() -> None:
+    """The bank has its own identity (B-3), nothing shared with RokuSec, and
+    serves it itself. A 404 here is silent, so it is asserted."""
     client = _client()
-    theme = client.get("/static/theme.css")
-    assert theme.status_code == 200
-    assert "--accent" in theme.text
-    assert "fonts.googleapis.com" not in theme.text
+    css = client.get("/static/bank.css")
+    assert css.status_code == 200
+    assert "Plus Jakarta Sans" in css.text
+    assert "fonts.googleapis.com" not in css.text
+    for path in ("/static/fonts/plus-jakarta-sans-latin-700-normal.woff2", "/static/brand/roku-bank-mark.svg"):
+        served = client.get(path)
+        assert served.status_code == 200, path
+    assert client.get("/static/fonts/plus-jakarta-sans-latin-700-normal.woff2").content[:4] == b"wOF2"
 
-    served = client.get("/static/fonts/instrument-sans-400700-latin.woff2")
-    assert served.status_code == 200
-    assert served.content[:4] == b"wOF2"
+
+def test_money_is_formatted_for_argentina() -> None:
+    from rba_demo_banking.main import ars
+
+    assert ars(1_750_320.15) == "$ 1.750.320,15"
+    assert ars(-12_430, signed=True) == "− $ 12.430,00"
+    assert ars(25_000, signed=True) == "+ $ 25.000,00"
 
 
 # ------------------------------------------------------------- C-1: cloud settings
