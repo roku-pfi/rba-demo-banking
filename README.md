@@ -85,6 +85,10 @@ uvicorn rba_demo_banking.main:app --reload --port 8002
 ```
 
 Open http://localhost:8002 — sign in as `martin@correo.example` / `martin-demo`.
+
+`DEPLOYMENT=cloud` (default `local`) marks the session cookie `Secure` and
+refuses to start unless `PUBLIC_URL` and `IDP_PUBLIC_URL` are https and
+`IDP_INTERNAL_URL` is not localhost. `COOKIE_SECURE` sets the flag on its own.
 Presenter kit: http://localhost:8002/walkthrough.
 
 ## Cluster

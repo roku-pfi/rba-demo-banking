@@ -72,6 +72,7 @@ def create_app(
         return {
             "httponly": True,
             "samesite": "lax",
+            "secure": settings.cookie_secure,
             "path": "/",
         }
 
