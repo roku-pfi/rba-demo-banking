@@ -198,10 +198,10 @@ def test_panel_with_a_secret_asks_for_it_first() -> None:
 
 
 def test_stuffing_levels_clear_the_pdp_thresholds() -> None:
-    # The PDP's burst threshold is 3 and its lockout 10 (rba-decision-service).
+    # ADR-0045 defaults: step-up at 3 unfamiliar failures, IP block at 10 per IP.
     assert presenter.STUFFING["burst"] * len(presenter.REGIONS) >= 3
-    assert presenter.STUFFING["burst"] * len(presenter.REGIONS) < 10
-    assert presenter.STUFFING["lockout"] * len(presenter.REGIONS) >= 10
+    assert presenter.STUFFING["burst"] < 10
+    assert presenter.STUFFING["lockout"] >= 10
 
 
 def test_stuffing_runs_every_region_with_wrong_passwords(monkeypatch) -> None:
@@ -216,8 +216,10 @@ def test_stuffing_runs_every_region_with_wrong_passwords(monkeypatch) -> None:
     assert resp.status_code == 200
     assert sorted(r for r, _ in seen) == sorted(r.id for r in presenter.REGIONS)
     for _, passwords in seen:
-        assert len(passwords) == presenter.STUFFING["lockout"]
-        assert "martin-demo" not in passwords
+        # Past the IP block, then the real password: refused all the same.
+        assert len(passwords) == presenter.STUFFING["lockout"] + 1
+        assert passwords[-1] == "martin-demo"
+        assert "martin-demo" not in passwords[:-1]
 
 
 def test_stuffing_rejects_an_unknown_level() -> None:
@@ -298,6 +300,11 @@ class FakeRedis:
     def delete(self, key):
         return 1 if self.data.pop(key, None) is not None else 0
 
+    def scan_iter(self, match):
+        import fnmatch
+
+        return [k for k in list(self.data) if fnmatch.fnmatch(k, match)]
+
 
 def _fake_redis(monkeypatch, data):
     import json as _json
@@ -313,10 +320,14 @@ def test_reset_failures_keeps_the_history(monkeypatch) -> None:
 
     store = _fake_redis(
         monkeypatch,
-        {"rba:profile:usr_rb_martin": {"login_count": 40, "failed_login_ts": [1.0, 2.0]}},
+        {
+            "rba:profile:usr_rb_martin": {"login_count": 40, "failed_login_ts": [1.0, 2.0]},
+            "rba:guard:roku-bank:ip:13.231.210.211:blocked": 1,
+        },
     )
     out = presenter.reset(Settings(_env_file=None, redis_url="redis://x"), "failures")
     assert out["users"] == ["usr_rb_martin"]
+    assert not any(k.startswith("rba:guard:") for k in store.data)
     blob = _json.loads(store.data["rba:profile:usr_rb_martin"])
     assert blob == {"login_count": 40, "failed_login_ts": []}
 

@@ -49,9 +49,9 @@
       <div class="row">
         <div>
           <b>Stuffing · sostenido</b>
-          <span class="dim" title="Cuatro contraseñas incorrectas desde cada región (12). Supera el umbral de bloqueo (10): el próximo login de Martín se bloquea.">12 fallos · 3 regiones</span>
+          <span class="dim" title="Diez contraseñas incorrectas desde cada región y después la real. Cada IP supera su umbral (10) y queda bloqueada: la contraseña correcta también se rechaza. Martín no se bloquea; su próximo login pide la passkey.">30 fallos + la real · 3 IPs</span>
         </div>
-        <span class="expect" title="Lo que pasa en el próximo login de Martín.">BLOCK</span>
+        <span class="expect" title="Lo que le pasa al atacante; Martín pasa con su passkey.">IP BLOCK</span>
         <button data-post="/presenter/attack/stuffing?level=lockout">Lanzar</button>
       </div>
 

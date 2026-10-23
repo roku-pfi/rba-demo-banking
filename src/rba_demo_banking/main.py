@@ -236,7 +236,9 @@ def create_app(
         _presenter(request)
         if level not in presenter.STUFFING:
             raise HTTPException(status_code=400, detail="level: burst | lockout")
-        return {"regions": attackers.stuffing(presenter.STUFFING[level])}
+        return {"regions": attackers.stuffing(
+            presenter.STUFFING[level], then_right=presenter.STUFFING_ENDS_WITH_PASSWORD[level]
+        )}
 
     @app.get("/presenter/travel")
     def presenter_travel(request: Request):

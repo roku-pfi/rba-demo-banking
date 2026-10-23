@@ -62,9 +62,12 @@ REGION_BY_ID = {r.id: r for r in REGIONS}
 # fires and not the hosting-network one.
 TRAVEL_COUNTRY, TRAVEL_ASN = "JP", "2516"
 
-# The PDP's burst threshold is 3 and its lockout 10. One wrong password per
-# region clears the first; four per region (12) clears the second.
-STUFFING = {"burst": 1, "lockout": 4}
+# Wrong passwords per region (ADR-0045 defaults: 3 failures from unfamiliar
+# contexts step Martín up; 10 from one IP block that IP). A burst steps him up.
+# Sustained: each region's IP passes its block and then tries the real password,
+# which is refused too. Martín himself is never blocked.
+STUFFING = {"burst": 1, "lockout": 10}
+STUFFING_ENDS_WITH_PASSWORD = {"burst": False, "lockout": True}
 
 
 def parse_attacker_urls(raw: str) -> dict[str, str]:
@@ -173,11 +176,15 @@ class Attackers:
         """Martín's real password from Tokyo. The attacker stops at the passkey."""
         return [self.run(REGION_BY_ID["ap-northeast-1"], [self._settings.victim_password])]
 
-    def stuffing(self, per_region: int) -> list[dict]:
-        """Wrong passwords from all three regions at once."""
-        wrong = [f"{w}-{uuid.uuid4().hex[:6]}" for w in ("123456", "qwerty", "martin2024", "password")]
+    def stuffing(self, per_region: int, *, then_right: bool = False) -> list[dict]:
+        """Wrong passwords from all three regions at once; optionally the real one last."""
+        common = ("123456", "qwerty", "martin2024", "password", "111111",
+                  "abc123", "123456789", "iloveyou", "admin", "letmein")
+        passwords = [f"{common[i % len(common)]}-{uuid.uuid4().hex[:6]}" for i in range(per_region)]
+        if then_right:
+            passwords.append(self._settings.victim_password)
         with ThreadPoolExecutor(len(REGIONS)) as pool:
-            return list(pool.map(lambda r: self.run(r, wrong[:per_region]), REGIONS))
+            return list(pool.map(lambda r: self.run(r, passwords), REGIONS))
 
 
 # ---------------------------------------------------------------- travel
@@ -219,6 +226,9 @@ def reset(settings: Settings, mode: str) -> dict:
     import redis  # only the panel needs it
 
     client = redis.Redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=3)
+    # Both modes lift the login guard's blocks and counters (ADR-0045).
+    for key in client.scan_iter(match="rba:guard:*"):
+        client.delete(key)
     touched = []
     for user_id in [u.strip() for u in settings.reset_user_ids.split(",") if u.strip()]:
         key = f"{settings.profile_key_prefix}{user_id}"
