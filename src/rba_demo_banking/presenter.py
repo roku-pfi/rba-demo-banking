@@ -153,8 +153,9 @@ class Attackers:
                     "ip_address": self._settings.attacker_ip,
                     "country": region.country,
                     "asn": region.asn,
+                    # As the Lambdas: the most common desktop browser (ADR-0043).
                     "device_type": "desktop",
-                    "os": "Linux",
+                    "os": "Windows",
                     "browser": "Chrome",
                 },
                 # Parallel attempts queue behind password hashing; the
