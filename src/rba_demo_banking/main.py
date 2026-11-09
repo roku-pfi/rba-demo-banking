@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from rba_demo_banking.accounts import accounts_for
 from rba_demo_banking.config import Settings, get_settings
 from rba_demo_banking.idp import HttpIdpClient, IdpClient, IdpError
 from rba_demo_banking import presenter
@@ -26,20 +27,18 @@ def ars(amount: float, *, signed: bool = False) -> str:
     return f"{sign}$ {whole.replace(',', '.')},{cents}"
 
 
-# Demo data: what a customer sees once signed in. Nothing here is real.
-BALANCES = (
-    {"name": "Caja de ahorro en pesos", "number": "···· 4412", "amount": ars(248_320.15)},
-    {"name": "Cuenta ahorro", "number": "···· 9081", "amount": ars(1_502_000.00)},
-)
-TOTAL = ars(248_320.15 + 1_502_000.00)
-MOVEMENTS = (
-    {"who": "Supermercado Día", "what": "Compra con débito", "when": "Hoy", "amount": ars(-12_430.00, signed=True), "icon": "S"},
-    {"who": "Sofía Paz", "what": "Transferencia recibida", "when": "Ayer", "amount": ars(25_000.00, signed=True), "icon": "SP"},
-    {"who": "Edesur", "what": "Pago de servicio", "when": "Ayer", "amount": ars(-18_760.40, signed=True), "icon": "E"},
-    {"who": "Sueldo · Kaze Labs", "what": "Acreditación", "when": "1 oct", "amount": ars(1_180_000.00, signed=True), "icon": "K"},
-    {"who": "Spotify", "what": "Suscripción", "when": "30 sep", "amount": ars(-4_299.00, signed=True), "icon": "S"},
-)
-TRANSFER = {"to": "Sofía Paz", "bank": "Roku Bank", "account": "···· 9081", "amount": ars(12_500.00)}
+def home_data(user_id: str) -> dict:
+    """What a customer sees once signed in: their own made-up accounts."""
+    acc = accounts_for(user_id)
+    return {
+        "balances": [{"name": n, "number": num, "amount": ars(a)} for n, num, a in acc.balances],
+        "total": ars(acc.total),
+        "movements": [
+            {"who": m.who, "what": m.what, "when": m.when, "amount": ars(m.amount, signed=True), "icon": m.icon}
+            for m in acc.movements
+        ],
+        "transfer": {"to": acc.transfer_to, "bank": "Roku Bank", "account": acc.transfer_account, "amount": ars(acc.transfer_amount)},
+    }
 
 
 def display_name(email: str) -> str:
@@ -110,6 +109,7 @@ def create_app(
             response.delete_cookie(settings.session_cookie, path="/")
             return response
         permissions = set(session.permissions)
+        data = home_data(session.user.user_id)
         return templates.TemplateResponse(
             request=request,
             name="home.html",
@@ -118,9 +118,9 @@ def create_app(
                 "name": display_name(session.user.email),
                 # A signed-in user without `account:read` sees the shell and no
                 # balances — sign-in and visibility are separate grants.
-                "balances": BALANCES if PERM_ACCOUNT_READ in permissions else (),
-                "total": TOTAL,
-                "movements": MOVEMENTS if PERM_ACCOUNT_READ in permissions else (),
+                "balances": data["balances"] if PERM_ACCOUNT_READ in permissions else (),
+                "total": data["total"],
+                "movements": data["movements"] if PERM_ACCOUNT_READ in permissions else (),
                 "can_transfer": PERM_TRANSFER_CREATE in permissions,
                 # Shown on the page: what the bank was handed, verbatim.
                 "permissions": sorted(permissions),
@@ -165,7 +165,7 @@ def create_app(
         return templates.TemplateResponse(
             request=request,
             name="transfer.html",
-            context={"email": session.user.email, "name": display_name(session.user.email), "transfer": TRANSFER, "sent": False, "can_transfer": True},
+            context={"email": session.user.email, "name": display_name(session.user.email), "transfer": home_data(session.user.user_id)["transfer"], "sent": False, "can_transfer": True},
         )
 
     @app.post("/transfer")
@@ -178,7 +178,7 @@ def create_app(
         return templates.TemplateResponse(
             request=request,
             name="transfer.html",
-            context={"email": session.user.email, "name": display_name(session.user.email), "transfer": TRANSFER, "sent": True, "can_transfer": True},
+            context={"email": session.user.email, "name": display_name(session.user.email), "transfer": home_data(session.user.user_id)["transfer"], "sent": True, "can_transfer": True},
         )
 
     # ---------------------------------------------------------------- presenter panel (D-1)

@@ -483,3 +483,15 @@ def test_cloud_login_link_does_not_pin_the_home_location() -> None:
     )
     url = login_url(settings)
     assert "country=" not in url and "asn=" not in url
+
+
+def test_each_customer_sees_their_own_accounts() -> None:
+    from rba_demo_banking.main import home_data
+
+    martin = home_data("usr_rb_martin")
+    assert martin["total"] == "$ 1.750.320,15"  # the demo script's figures
+    sofia, sofia_again = home_data("usr_rb_sofia"), home_data("usr_rb_sofia")
+    assert sofia == sofia_again
+    assert sofia["balances"] != martin["balances"]
+    assert home_data("usr_rb_other")["balances"] != sofia["balances"]
+    assert len(sofia["movements"]) == 5
