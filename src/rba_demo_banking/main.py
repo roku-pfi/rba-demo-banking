@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -180,6 +180,87 @@ def create_app(
             name="transfer.html",
             context={"email": session.user.email, "name": display_name(session.user.email), "transfer": home_data(session.user.user_id)["transfer"], "sent": True, "can_transfer": True},
         )
+
+    # ------------------------------------------------- someone tried the password (0.22.0)
+
+    def _signed_in(request: Request):
+        token = request.cookies.get(settings.session_cookie)
+        if not token:
+            return None, None
+        try:
+            return token, idp.get_session(token)
+        except IdpError:
+            return None, None
+
+    @app.get("/attempts")
+    def attempts(request: Request):
+        """Polled by every signed-in page: a banner while the person is in."""
+        token = request.cookies.get(settings.session_cookie)
+        if not token:
+            return JSONResponse({"attempts": []}, status_code=401)
+        try:
+            found = idp.attempts(token)
+        except IdpError:
+            return JSONResponse({"attempts": []}, status_code=401)
+        return {"attempts": [a.model_dump(mode="json") for a in found]}
+
+    @app.post("/attempts/seen", status_code=204)
+    def attempts_seen(request: Request, up_to: str = Form(...)):
+        token = request.cookies.get(settings.session_cookie)
+        if token:
+            try:
+                idp.dismiss_attempts(token, up_to)
+            except IdpError:
+                pass
+        return Response(status_code=204)
+
+    def _password_page(request: Request, session, *, error: str | None = None, done: bool = False, status_code: int = 200):
+        return templates.TemplateResponse(
+            request=request,
+            name="password.html",
+            status_code=status_code,
+            context={
+                "email": session.user.email,
+                "name": display_name(session.user.email),
+                "can_transfer": PERM_TRANSFER_CREATE in set(session.permissions),
+                "active": "password",
+                "error": error,
+                "done": done,
+            },
+        )
+
+    @app.get("/clave")
+    def password_form(request: Request):
+        token, session = _signed_in(request)
+        if session is None:
+            return RedirectResponse(login_url(settings), status_code=302)
+        return _password_page(request, session)
+
+    @app.post("/clave")
+    def password_submit(
+        request: Request,
+        current: str = Form(...),
+        new: str = Form(...),
+        again: str = Form(...),
+    ):
+        token, session = _signed_in(request)
+        if session is None:
+            return RedirectResponse(login_url(settings), status_code=302)
+        if new != again:
+            return _password_page(request, session, error="Las contraseñas nuevas no coinciden.", status_code=422)
+        if new == current:
+            return _password_page(request, session, error="Elegí una contraseña distinta de la actual.", status_code=422)
+        try:
+            status = idp.change_password(token, current, new)
+        except IdpError:
+            return _password_page(request, session, error="No se pudo cambiar. Probá de nuevo.", status_code=503)
+        if status == 204:
+            return _password_page(request, session, done=True)
+        error = {
+            403: "La contraseña actual no es correcta.",
+            422: "La nueva contraseña necesita al menos 8 caracteres.",
+        }.get(status, "No se pudo cambiar. Probá de nuevo.")
+        return _password_page(request, session, error=error, status_code=422 if status == 422 else 400)
 
     # ---------------------------------------------------------------- presenter panel (D-1)
 

@@ -64,6 +64,25 @@ class StubIdp:
     def logout(self, token: str) -> None:
         self.sessions.pop(token, None)
 
+    stopped: list = []
+    dismissed: list = []
+    password: str = "martin-demo"
+
+    def attempts(self, token: str):
+        if token not in self.sessions:
+            raise IdpError("missing or expired session")
+        return list(self.stopped)
+
+    def dismiss_attempts(self, token: str, up_to: str) -> None:
+        self.dismissed.append(up_to)
+        self.stopped = []
+
+    def change_password(self, token: str, current: str, new: str) -> int:
+        if current != self.password:
+            return 403
+        self.password = new
+        return 204
+
 
 def _client(idp: StubIdp | None = None) -> TestClient:
     settings = Settings(
@@ -495,3 +514,33 @@ def test_each_customer_sees_their_own_accounts() -> None:
     assert sofia["balances"] != martin["balances"]
     assert home_data("usr_rb_other")["balances"] != sofia["balances"]
     assert len(sofia["movements"]) == 5
+
+
+
+def test_a_signed_in_customer_is_told_of_a_stopped_attempt() -> None:
+    from rba_contracts import StoppedAttempt
+
+    idp = StubIdp()
+    idp.stopped = [StoppedAttempt(occurred_at=datetime(2026, 11, 9, 22, tzinfo=timezone.utc), country="JP", stopped_by="passkey")]
+    client = _client(idp)
+    assert client.get("/attempts").status_code == 401  # not signed in
+    client.cookies.set("rba_demo_session", "sess-token")
+    [attempt] = client.get("/attempts").json()["attempts"]
+    assert attempt["country"] == "JP"
+    home = client.get("/").text
+    assert 'id="attempts"' in home and "/static/attempts.js" in home
+    assert client.post("/attempts/seen", data={"up_to": attempt["occurred_at"]}).status_code == 204
+    assert client.get("/attempts").json()["attempts"] == []
+
+
+def test_the_customer_changes_the_password_in_the_bank() -> None:
+    idp = StubIdp()
+    client = _client(idp)
+    client.cookies.set("rba_demo_session", "sess-token")
+    assert "Contraseña actual" in client.get("/clave").text
+    wrong = client.post("/clave", data={"current": "nope", "new": "otra-clave-1", "again": "otra-clave-1"})
+    assert "no es correcta" in wrong.text
+    mismatch = client.post("/clave", data={"current": "martin-demo", "new": "otra-clave-1", "again": "otra-clave-2"})
+    assert "no coinciden" in mismatch.text
+    done = client.post("/clave", data={"current": "martin-demo", "new": "otra-clave-1", "again": "otra-clave-1"})
+    assert "Contraseña cambiada" in done.text and idp.password == "otra-clave-1"

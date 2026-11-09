@@ -18,12 +18,24 @@
       <summary><span class="avatar" aria-hidden="true">{{ name[:1] }}</span><span>{{ name }}</span></summary>
       <div class="me-menu">
         <div class="email">{{ email }}</div>
+        <a class="me-link" href="/clave">Cambiar contraseña</a>
         <form method="post" action="/logout"><button type="submit">Cerrar sesión</button></form>
       </div>
     </details>
   </header>
+  <div class="alert" id="attempts" role="alert" hidden>
+    <div class="alert-text">
+      <strong>Alguien intentó ingresar a tu cuenta</strong>
+      <span id="attempts-where"></span>
+    </div>
+    <div class="alert-actions">
+      <a class="button small" href="/clave">Cambiar contraseña</a>
+      <button type="button" class="button small ghost" id="attempts-ok">Entendido</button>
+    </div>
+  </div>
   <main>
     {% block main %}{% endblock %}
   </main>
+  <script src="/static/attempts.js" defer></script>
 </body>
 </html>

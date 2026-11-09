@@ -163,3 +163,33 @@ main { max-width: 64rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
 .done .check { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.25rem; border-radius: 50%; background: var(--lime); color: var(--pine-deep); }
 .done h1 { margin-bottom: 0.5rem; }
 .done p { color: var(--muted); margin: 0 0 2rem; }
+
+/* Someone got the password right and was stopped: told while signed in. */
+.alert {
+  max-width: 64rem;
+  margin: 0.5rem auto 0;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff4e5;
+  border: 1px solid #f1c27d;
+  border-radius: 16px;
+  color: #5c3b00;
+}
+.alert[hidden] { display: none; }
+.alert-text { display: grid; gap: 0.2rem; min-width: 0; flex: 1 1 22rem; font-size: 0.9rem; }
+.alert-text strong { font-size: 1rem; color: #3d2700; }
+.alert-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.button.small { display: inline-block; width: auto; padding: 0.6rem 1.1rem; font-size: 0.9rem; }
+@media (max-width: 64rem) { .alert { margin: 0.5rem 1rem 0; } }
+.me-link { display: block; padding: 0.625rem 0.75rem; border-radius: 10px; color: inherit; font-weight: 600; text-decoration: none; }
+.me-link:hover { background: var(--bg); }
+.form { display: grid; gap: 0.5rem; }
+.form label { font-size: 0.85rem; color: var(--muted); }
+.form input { padding: 0.8rem 1rem; border: 1px solid var(--line); border-radius: 12px; font: inherit; }
+.form input:focus { outline: 2px solid var(--pine); outline-offset: 1px; }
+.form .button { margin-top: 0.75rem; }
+.form-error { color: #b42318; font-size: 0.9rem; margin: 0.25rem 0 0; }
