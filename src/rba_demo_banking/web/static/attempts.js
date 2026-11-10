@@ -15,10 +15,11 @@
     if (!attempts.length) { box.hidden = true; return; }
     const a = attempts[0];
     newest = a.occurred_at;
+    // Where and when, never how it was stopped: the owner needs to know to
+    // change the password, not which control the attacker ran into.
     const place = a.country ? (COUNTRY?.of(a.country) ?? a.country) : "un lugar desconocido";
-    const how = a.stopped_by === "passkey" ? "le pedimos tu passkey" : "lo bloqueamos";
-    const more = attempts.length > 1 ? ` y ${attempts.length - 1} más` : "";
-    where.textContent = `Desde ${place}, ${WHEN.format(new Date(a.occurred_at))}: ${how}${more}. Si no fuiste vos, cambiá tu contraseña.`;
+    const more = attempts.length > 1 ? ` (y ${attempts.length - 1} más)` : "";
+    where.textContent = `Detectamos un ingreso sospechoso desde ${place}, ${WHEN.format(new Date(a.occurred_at))}${more}. Te recomendamos cambiar tu contraseña.`;
     box.hidden = false;
   }
 
