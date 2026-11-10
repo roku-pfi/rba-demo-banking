@@ -27,6 +27,11 @@
     <div class="alert-text">
       <strong>Alguien intentó ingresar a tu cuenta</strong>
       <span id="attempts-where"></span>
+      <button type="button" class="link-button" id="attempts-more" aria-expanded="false" aria-controls="attempts-details">Ver detalles</button>
+      <table class="alert-details" id="attempts-details" hidden>
+        <thead><tr><th>Cuándo</th><th>Desde</th><th>Dispositivo</th><th>Dirección IP</th></tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
     <div class="alert-actions">
       <a class="button small" href="/clave">Cambiar contraseña</a>

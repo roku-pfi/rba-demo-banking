@@ -9,7 +9,38 @@
     try { return new Intl.DisplayNames(["es"], { type: "region" }); } catch { return null; }
   })();
   const WHEN = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const DEVICE = { desktop: "computadora", mobile: "celular", tablet: "tablet" };
+  const more = document.getElementById("attempts-more");
+  const details = document.getElementById("attempts-details");
   let newest = null;
+
+  // "Chrome en Windows · computadora", as a bank lists a sign-in.
+  function device(a) {
+    const what = [a.browser, a.os].filter(Boolean).join(" en ");
+    const kind = DEVICE[a.device_type] ?? null;
+    return [what, kind].filter(Boolean).join(" · ") || "Desconocido";
+  }
+
+  function fillDetails(attempts) {
+    const body = details.querySelector("tbody");
+    body.replaceChildren(...attempts.slice(0, 5).map((a) => {
+      const row = document.createElement("tr");
+      const place = a.country ? (COUNTRY?.of(a.country) ?? a.country) : "Desconocido";
+      for (const text of [WHEN.format(new Date(a.occurred_at)), place, device(a), a.ip_address || "—"]) {
+        const cell = document.createElement("td");
+        cell.textContent = text;
+        row.append(cell);
+      }
+      return row;
+    }));
+  }
+
+  more.addEventListener("click", () => {
+    const open = details.hidden;
+    details.hidden = !open;
+    more.setAttribute("aria-expanded", String(open));
+    more.textContent = open ? "Ocultar detalles" : "Ver detalles";
+  });
 
   function render(attempts) {
     if (!attempts.length) { box.hidden = true; return; }
@@ -18,8 +49,9 @@
     // Where and when, never how it was stopped: the owner needs to know to
     // change the password, not which control the attacker ran into.
     const place = a.country ? (COUNTRY?.of(a.country) ?? a.country) : "un lugar desconocido";
-    const more = attempts.length > 1 ? ` (y ${attempts.length - 1} más)` : "";
-    where.textContent = `Detectamos un ingreso sospechoso desde ${place}, ${WHEN.format(new Date(a.occurred_at))}${more}. Te recomendamos cambiar tu contraseña.`;
+    const others = attempts.length > 1 ? ` (y ${attempts.length - 1} más)` : "";
+    where.textContent = `Detectamos un ingreso sospechoso desde ${place}, ${WHEN.format(new Date(a.occurred_at))}${others}. Te recomendamos cambiar tu contraseña.`;
+    fillDetails(attempts);
     box.hidden = false;
   }
 

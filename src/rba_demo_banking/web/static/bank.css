@@ -183,6 +183,11 @@ main { max-width: 64rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
 .alert-text { display: grid; gap: 0.2rem; min-width: 0; flex: 1 1 22rem; font-size: 0.9rem; }
 .alert-text strong { font-size: 1rem; color: #3d2700; }
 .alert-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.link-button { justify-self: start; padding: 0; border: 0; background: none; font: inherit; font-size: 0.85rem; font-weight: 600; color: #7a4f00; text-decoration: underline; cursor: pointer; }
+.alert-details { margin-top: 0.5rem; border-collapse: collapse; font-size: 0.85rem; }
+.alert-details th { text-align: left; font-weight: 600; color: #7a4f00; padding: 0.25rem 1.25rem 0.25rem 0; }
+.alert-details td { padding: 0.25rem 1.25rem 0.25rem 0; border-top: 1px solid #f1d7a8; }
+.alert-details[hidden] { display: none; }
 .button.small { display: inline-block; width: auto; padding: 0.6rem 1.1rem; font-size: 0.9rem; }
 @media (max-width: 64rem) { .alert { margin: 0.5rem 1rem 0; } }
 .me-link { display: block; padding: 0.625rem 0.75rem; border-radius: 10px; color: inherit; font-weight: 600; text-decoration: none; }
