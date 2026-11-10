@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rba_contracts import CallbackTokenRequest, CallbackTokenResponse, SessionResponse, StoppedAttempt
+from rba_contracts import AccountLinkResponse, CallbackTokenRequest, CallbackTokenResponse, SessionResponse, StoppedAttempt
 
 import httpx
 
@@ -19,7 +19,7 @@ class IdpClient:
     def logout(self, token: str) -> None: ...
     def attempts(self, token: str) -> list[StoppedAttempt]: ...
     def dismiss_attempts(self, token: str, up_to: str) -> None: ...
-    def change_password(self, token: str, current: str, new: str) -> int: ...
+    def password_link(self, token: str, return_to: str) -> str: ...
 
 
 class HttpIdpClient(IdpClient):
@@ -88,15 +88,21 @@ class HttpIdpClient(IdpClient):
         except httpx.HTTPError as exc:
             raise IdpError("IdP unavailable") from exc
 
-    def change_password(self, token: str, current: str, new: str) -> int:
-        """The IdP's status: 204 done, 403 wrong current password, 422 rejected."""
+    def password_link(self, token: str, return_to: str) -> str:
+        """A one-time path on the IdP to its password page (contracts 0.25.0).
+
+        The change is confirmed with the passkey, which belongs to the IdP's
+        domain; in the cloud that is not the bank's, so it happens there.
+        """
         try:
             resp = httpx.post(
-                f"{self._base}/account/password",
-                json={"current_password": current, "new_password": new},
+                f"{self._base}/account/password/link",
+                json={"return_to": return_to},
                 headers=self._auth(token),
-                timeout=max(self._timeout, 5.0),  # two password hashes
+                timeout=self._timeout,
             )
         except httpx.HTTPError as exc:
             raise IdpError("IdP unavailable") from exc
-        return resp.status_code
+        if resp.status_code != 200:
+            raise IdpError(f"no password link ({resp.status_code})")
+        return AccountLinkResponse.model_validate(resp.json()).path

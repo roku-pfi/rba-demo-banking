@@ -214,7 +214,7 @@ def create_app(
                 pass
         return Response(status_code=204)
 
-    def _password_page(request: Request, session, *, error: str | None = None, done: bool = False, status_code: int = 200):
+    def _password_page(request: Request, session, *, error: str, status_code: int):
         return templates.TemplateResponse(
             request=request,
             name="password.html",
@@ -225,42 +225,21 @@ def create_app(
                 "can_transfer": PERM_TRANSFER_CREATE in set(session.permissions),
                 "active": "password",
                 "error": error,
-                "done": done,
             },
         )
 
     @app.get("/clave")
-    def password_form(request: Request):
+    def password_change(request: Request):
+        """The change happens on the IdP's page, where the passkey that
+        confirms it works (contracts 0.25.0); it brings the customer back."""
         token, session = _signed_in(request)
         if session is None:
             return RedirectResponse(login_url(settings), status_code=302)
-        return _password_page(request, session)
-
-    @app.post("/clave")
-    def password_submit(
-        request: Request,
-        current: str = Form(...),
-        new: str = Form(...),
-        again: str = Form(...),
-    ):
-        token, session = _signed_in(request)
-        if session is None:
-            return RedirectResponse(login_url(settings), status_code=302)
-        if new != again:
-            return _password_page(request, session, error="Las contraseñas nuevas no coinciden.", status_code=422)
-        if new == current:
-            return _password_page(request, session, error="Elegí una contraseña distinta de la actual.", status_code=422)
         try:
-            status = idp.change_password(token, current, new)
+            path = idp.password_link(token, f"{settings.public_url.rstrip('/')}/")
         except IdpError:
-            return _password_page(request, session, error="No se pudo cambiar. Probá de nuevo.", status_code=503)
-        if status == 204:
-            return _password_page(request, session, done=True)
-        error = {
-            403: "La contraseña actual no es correcta.",
-            422: "La nueva contraseña necesita al menos 8 caracteres.",
-        }.get(status, "No se pudo cambiar. Probá de nuevo.")
-        return _password_page(request, session, error=error, status_code=422 if status == 422 else 400)
+            return _password_page(request, session, error="No se pudo abrir el cambio de contraseña. Probá de nuevo.", status_code=503)
+        return RedirectResponse(f"{settings.idp_public_url.rstrip('/')}{path}", status_code=303)
 
     # ---------------------------------------------------------------- presenter panel (D-1)
 

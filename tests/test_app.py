@@ -26,6 +26,8 @@ class StubIdp:
         self.codes: dict[str, str] = {"good-code": "sess-token"}
         self.sessions: dict[str, str] = {"sess-token": "martin@correo.example"}
         self.exchanges: list[str] = []
+        self.links: list[str] = []
+        self.down = False
         self.permissions = (
             CUSTOMER_PERMISSIONS if permissions is None else permissions
         )
@@ -77,11 +79,11 @@ class StubIdp:
         self.dismissed.append(up_to)
         self.stopped = []
 
-    def change_password(self, token: str, current: str, new: str) -> int:
-        if current != self.password:
-            return 403
-        self.password = new
-        return 204
+    def password_link(self, token: str, return_to: str) -> str:
+        if token not in self.sessions or self.down:
+            raise IdpError("no password link")
+        self.links.append(return_to)
+        return "/account/password?code=one-time"
 
 
 def _client(idp: StubIdp | None = None) -> TestClient:
@@ -533,14 +535,15 @@ def test_a_signed_in_customer_is_told_of_a_stopped_attempt() -> None:
     assert client.get("/attempts").json()["attempts"] == []
 
 
-def test_the_customer_changes_the_password_in_the_bank() -> None:
+def test_the_password_change_goes_to_the_idps_page_and_back() -> None:
+    """Confirmed with the passkey, which is the IdP's: the bank sends the
+    customer there with a one-time link, to come back to the bank."""
     idp = StubIdp()
     client = _client(idp)
     client.cookies.set("rba_demo_session", "sess-token")
-    assert "Contraseña actual" in client.get("/clave").text
-    wrong = client.post("/clave", data={"current": "nope", "new": "otra-clave-1", "again": "otra-clave-1"})
-    assert "no es correcta" in wrong.text
-    mismatch = client.post("/clave", data={"current": "martin-demo", "new": "otra-clave-1", "again": "otra-clave-2"})
-    assert "no coinciden" in mismatch.text
-    done = client.post("/clave", data={"current": "martin-demo", "new": "otra-clave-1", "again": "otra-clave-1"})
-    assert "Contraseña cambiada" in done.text and idp.password == "otra-clave-1"
+    resp = client.get("/clave", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "http://idp.test/account/password?code=one-time"
+    assert idp.links == ["http://bank.test/"]
+    idp.down = True
+    assert "Reintentar" in client.get("/clave").text
