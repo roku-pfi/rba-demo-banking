@@ -8,7 +8,7 @@
   const COUNTRY = (() => {
     try { return new Intl.DisplayNames(["es"], { type: "region" }); } catch { return null; }
   })();
-  const WHEN = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const WHEN = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const DEVICE = { desktop: "computadora", mobile: "celular", tablet: "tablet" };
   const more = document.getElementById("attempts-more");
   const details = document.getElementById("attempts-details");
